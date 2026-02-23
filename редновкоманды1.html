@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Route Editor Pro | Optimized</title>
+    <title>Route Editor Pro | Context Commands</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <script src="https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=ru_RU&suppressMapOpenBlock=true"></script>
     <style>
@@ -24,7 +24,7 @@
         .btn-action.danger { background: rgba(255, 59, 48, 0.1); color: var(--danger); }
         .btn-action.sec { background: #f0f0f2; color: #333; }
         .editor-section { padding: 20px; overflow-y: auto; }
-        input, textarea { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; box-sizing: border-box; outline: none; margin-bottom: 12px; background: #f9f9fb; }
+        input, textarea, select { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; box-sizing: border-box; outline: none; margin-bottom: 12px; background: #f9f9fb; font-family: inherit; }
         .gist-item { padding: 14px; border-radius: 16px; background: #f9f9fb; margin-bottom: 10px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .gist-item.active { border-color: var(--btn); background: #eef7ff; }
         .btn-delete-gist { background: none; border: none; color: var(--danger); font-size: 20px; padding: 10px; }
@@ -38,6 +38,7 @@
         #syncStatus { font-size: 13px; color: var(--success); text-align: center; font-weight: 600; margin-top: 10px; }
         .hidden { display: none !important; }
         .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #8e8e93; margin: 0 0 6px 4px; }
     </style>
 </head>
 <body>
@@ -72,8 +73,10 @@
     <div class="modal-content">
         <div class="modal-header"><h3>Новая точка</h3><div id="newColorBtn" class="color-preview-circle" onclick="toggleD('newColorDropdown')"></div><button class="fab-mini" style="width:36px;height:36px;font-size:14px" onclick="toggleM('createPointModal')">✕</button></div>
         <div class="editor-section">
-            <input type="text" id="newCmd" placeholder="Команда">
-            <textarea id="newComm" rows="3" placeholder="Комментарий"></textarea>
+            <label>Команда</label>
+            <select id="newCmdSelect"></select>
+            <label>Комментарий</label>
+            <textarea id="newComm" rows="3" placeholder="Дополнительная информация..."></textarea>
             <button class="btn-action" style="background:var(--success);width:100%" onclick="confirmP()">📍 Установить на карту</button>
         </div>
     </div>
@@ -83,8 +86,10 @@
     <div class="modal-content">
         <div class="modal-header"><h3 id="editTitle">Настройки</h3><div id="editColorBtn" class="color-preview-circle" onclick="toggleD('editColorDropdown')"></div><button class="fab-mini" style="width:36px;height:36px;font-size:14px" onclick="applyChanges(); toggleM('editModal')">✕</button></div>
         <div class="editor-section">
-            <input type="text" id="editCmd" placeholder="Команда" oninput="applyChanges()">
-            <textarea id="editComm" rows="3" placeholder="Комментарий" oninput="applyChanges()"></textarea>
+            <label>Команда</label>
+            <select id="editCmdSelect" onchange="applyChanges()"></select>
+            <label>Комментарий</label>
+            <textarea id="editComm" rows="3" placeholder="Дополнительная информация..." oninput="applyChanges()"></textarea>
             <div style="display:flex;gap:10px;margin-top:5px">
                 <button class="btn-action" onclick="applyChanges(); startEditPath()">🛤️ Путь</button>
                 <button class="btn-action danger" onclick="delP()">🗑️ Удалить</button>
@@ -99,11 +104,65 @@
 <script>
 const $ = id => document.getElementById(id);
 const f6 = n => Math.round(n * 1e6) / 1e6;
+
+// Предустановленные команды для каждого цвета
+const COMMAND_SETS = {
+    Gold: [
+        "На перекрестке едем прямо",
+        "На перекрестке повернем направо",
+        "На перекрестке повернем налево",
+        "На круговом движении первый съезд",
+        "На круговом движении второй съезд",
+        "На круговом движении третий съезд",
+        "На круговом движении четвертый съезд",
+        "На круговом движении повернем направо"
+    ],
+    Blue: [
+        "Разворот вне перекрестка",
+        "Поиск места для разворота",
+        "Выполняем разворот"
+    ],
+    Red: [
+        "Разгон до максимально допустимой скорости",
+        "Движение с максимально возможной скоростью",
+        "Интенсивный разгон"
+    ],
+    Fuchsia: [
+        "Остановка для высадки пассажира",
+        "Начало движения",
+        "Остановка у края проезжей части"
+    ],
+    Orange: [
+        "На светофоре прямо",
+        "На светофоре направо",
+        "На светофоре налево",
+        "Поворачиваем направо к ленте",
+        "Поворачиваем направо на заправку"
+    ],
+    Purple: [
+        "Параллельная парковка",
+        "Заезд в бокс (гараж)",
+        "Постановка на стоянку"
+    ],
+    Cyan: [
+        "Разворот в ограниченном пространстве",
+        "Маневрирование назад"
+    ],
+    Brown: [
+        "Остановка",
+        "Длительная стоянка"
+    ]
+};
+
 const COLORS = { 
-    Gold: { hex: '#FFD700', label: 'Маневры на перекрестке' }, Blue: { hex: '#007AFF', label: 'Разворот вне перекрестка' }, 
-    Red: { hex: '#FF3B30', label: 'Разгон до максимальной скорости' }, Fuchsia: { hex: '#AF52DE', label: 'Остановка и начало движения на подъем' }, 
-    Orange: { hex: '#FF9500', label: 'Левые и правые повороты' }, Purple: { hex: '#5856D6', label: 'Параллельная парковка и гараж' }, 
-    Cyan: { hex: '#5AC8FA', label: 'Разворот в ограниченном пространстве' }, Brown: { hex: '#A2845E', label: 'Остановка' } 
+    Gold: { hex: '#FFD700', label: 'Маневры на перекрестке' }, 
+    Blue: { hex: '#007AFF', label: 'Разворот вне перекрестка' }, 
+    Red: { hex: '#FF3B30', label: 'Разгон до максимальной скорости' }, 
+    Fuchsia: { hex: '#AF52DE', label: 'Остановка и начало движения на подъем' }, 
+    Orange: { hex: '#FF9500', label: 'Левые и правые повороты' }, 
+    Purple: { hex: '#5856D6', label: 'Параллельная парковка и гараж' }, 
+    Cyan: { hex: '#5AC8FA', label: 'Разворот в ограниченном пространстве' }, 
+    Brown: { hex: '#A2845E', label: 'Остановка' } 
 };
 
 let map, points = [], cur = null, isAdd = false, curGist = null, curFile = null, pend = { color: 'Gold', cmd: '', comm: '' };
@@ -111,6 +170,20 @@ let map, points = [], cur = null, isAdd = false, curGist = null, curFile = null,
 const getSvg = (col, txt, az, isEnd) => {
     const s = isEnd ? 34 : 40, c = s/2;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}"><g transform="rotate(${az},${c},${c})"><polygon points="${c},2 ${s*0.75},${s-5} ${c},${s*0.65} ${s*0.25},${s-5}" fill="${col}" stroke="#000" stroke-width="1.5"/></g><circle cx="${c}" cy="${c}" r="${isEnd?7:9}" fill="${col}" stroke="#000" stroke-width="1"/><text x="${c}" y="${c+3}" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" style="paint-order:stroke fill">${txt}</text></svg>`);
+};
+
+// Функция обновления списка команд в Select в зависимости от цвета
+const updateCommandOptions = (selectId, colorName, currentValue = "") => {
+    const select = $(selectId);
+    select.innerHTML = '';
+    const commands = COMMAND_SETS[colorName] || ["Без команды"];
+    commands.forEach(cmd => {
+        const opt = document.createElement('option');
+        opt.value = cmd;
+        opt.textContent = cmd;
+        if(cmd === currentValue) opt.selected = true;
+        select.appendChild(opt);
+    });
 };
 
 ymaps.ready(() => {
@@ -121,8 +194,20 @@ ymaps.ready(() => {
             startDrawingForPoint(p);
         } 
     });
-    initD('newColorDropdown', 'newColorBtn', (h, n) => pend.color = n);
-    initD('editColorDropdown', 'editColorBtn', (h, n) => { if(cur) { cur.color = n; applyChanges(); } });
+    
+    // Инициализация выпадающих списков цветов
+    initD('newColorDropdown', 'newColorBtn', (h, n) => {
+        pend.color = n;
+        updateCommandOptions('newCmdSelect', n);
+    });
+    initD('editColorDropdown', 'editColorBtn', (h, n) => { 
+        if(cur) { 
+            cur.color = n; 
+            updateCommandOptions('editCmdSelect', n);
+            applyChanges(); 
+        } 
+    });
+    
     const t = localStorage.getItem('gh_t_gist'); if(t) { $('ghToken').value = t; refreshGists(); }
 });
 
@@ -139,8 +224,27 @@ const toggleD = id => { const d = $(id), vis = d.style.display === 'flex'; close
 const closeD = () => { document.querySelectorAll('.color-dropdown').forEach(dr => dr.style.display = 'none'); $('dropdownOverlay').style.display = 'none'; };
 const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; };
 
-const openCreateModal = () => { if(isAdd) return stopAdd(); ['newCmd', 'newComm'].forEach(i => $(i).value = ''); pend = { color: 'Gold', cmd: '', comm: '' }; $('newColorBtn').style.background = COLORS.Gold.hex; closeD(); toggleM('createPointModal'); };
-const confirmP = () => { pend.cmd = $('newCmd').value.trim(); pend.comm = $('newComm').value.trim(); toggleM('createPointModal'); isAdd = true; $('addIcon').textContent = "✕"; $('addText').textContent = "Отмена"; $('addMarkerBtn').classList.add('active'); map.setCursor('crosshair'); };
+const openCreateModal = () => { 
+    if(isAdd) return stopAdd(); 
+    $('newComm').value = ''; 
+    pend = { color: 'Gold', cmd: '', comm: '' }; 
+    $('newColorBtn').style.background = COLORS.Gold.hex; 
+    updateCommandOptions('newCmdSelect', 'Gold');
+    closeD(); 
+    toggleM('createPointModal'); 
+};
+
+const confirmP = () => { 
+    pend.cmd = $('newCmdSelect').value; 
+    pend.comm = $('newComm').value.trim(); 
+    toggleM('createPointModal'); 
+    isAdd = true; 
+    $('addIcon').textContent = "✕"; 
+    $('addText').textContent = "Отмена"; 
+    $('addMarkerBtn').classList.add('active'); 
+    map.setCursor('crosshair'); 
+};
+
 const stopAdd = () => { isAdd = false; $('addIcon').textContent = "+"; $('addText').textContent = "Добавить точку"; $('addMarkerBtn').classList.remove('active'); map.setCursor('grab'); };
 
 const startDrawingForPoint = p => {
@@ -185,13 +289,25 @@ const stopDrawingMode = () => {
     map.setCursor('grab'); cur = null; 
 };
 
-const openEdit = p => { cur = p; const pa = p.paths[0] || { cmd: [], comm: '' }; $('editTitle').textContent = `Метка #${p.id}`; $('editComm').value = pa.comm || ''; $('editCmd').value = pa.cmd?.[0] || ''; $('editColorBtn').style.background = COLORS[p.color].hex; closeD(); toggleM('editModal'); };
+const openEdit = p => { 
+    cur = p; 
+    const pa = p.paths[0] || { cmd: [], comm: '' }; 
+    $('editTitle').textContent = `Метка #${p.id}`; 
+    $('editComm').value = pa.comm || ''; 
+    
+    // Загружаем команды для текущего цвета и выбираем текущую
+    updateCommandOptions('editCmdSelect', p.color, pa.cmd?.[0] || "");
+    
+    $('editColorBtn').style.background = COLORS[p.color].hex; 
+    closeD(); 
+    toggleM('editModal'); 
+};
 
 function applyChanges() {
     if(!cur) return; const pa = cur.paths[0];
     if(pa) { 
         pa.comm = $('editComm').value; 
-        const v = $('editCmd').value.trim(); 
+        const v = $('editCmdSelect').value; 
         pa.cmd = v ? [v] : []; 
         pa.line.options.set('strokeColor', COLORS[cur.color].hex); 
         if(pa.pmEnd) updPI(pa, 1); 
@@ -279,7 +395,6 @@ async function loadGist(id, fn) {
 
 async function saveGist() {
     if(!curGist) return;
-    // Формирование структуры JSON с полями cmd и comm
     const data = points.map(p => ({ 
         id: p.id, 
         lat: p.lat, 
@@ -288,8 +403,8 @@ async function saveGist() {
         color: p.color, 
         paths: p.paths.map(pa => ({ 
             pts: pa.pts, 
-            cmd: pa.cmd, // массив команд
-            comm: pa.comm || "", // комментарий строкой
+            cmd: pa.cmd, 
+            comm: pa.comm || "", 
             az: pa.az 
         })) 
     }));
