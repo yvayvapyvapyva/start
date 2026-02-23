@@ -142,7 +142,17 @@ async function interact() {
 
 function playCommand(text) {
     if (!text) return;
-    const path = `audio/${encodeURIComponent(text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "").trim().replace(/\s+/g, '_').normalize('NFD'))}.mp3`;
+    
+    // Нормализация Unicode (NFC) исправляет проблему с буквой "й", 
+    // которая может быть представлена как 'и' + 'кратка'.
+    // Также очищаем лишние символы для формирования пути к файлу.
+    const normalizedText = text.normalize('NFC')
+                               .toLowerCase()
+                               .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
+                               .trim()
+                               .replace(/\s+/g, '_');
+                               
+    const path = `audio/${encodeURIComponent(normalizedText)}.mp3`;
     new Audio(path).play().catch(e => console.warn("Audio failed", path));
 }
 
@@ -229,16 +239,14 @@ async function fetchGists() {
 
 async function loadData(url) {
     ui('loading').innerText = "Загрузка..."; ui('loading').classList.remove('hidden');
-    // Очистка кэша иконок перед загрузкой нового маршрута
     iconCache.clear();
-    // Очистка карты
     objectManager.removeAll();
     pathsCollection.removeAll();
     previewPathsCollection.removeAll();
     
     try {
         const res = await fetch(url);
-        pointsData = (await res.json()).map(d => ({ ...d, hex: CFG.COLORS[d.color] || d.color || '#007AFF', cmd: d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`, az: d.az||0 }));
+        pointsData = (await res.json()).map(d => ({ ...d, hex: CFG.COLORS[d.color] || d.color || '#007AFF', cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), az: d.az||0 }));
         currentIndex = 0; refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
         ui('navHud').classList.add('active');
