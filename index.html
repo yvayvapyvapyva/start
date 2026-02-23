@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Меню</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .nav-link {
+            border: 1px solid #333;
+            transition: all 0.2s ease;
+        }
+        .nav-link:active {
+            background-color: #ffffff;
+            color: #000000;
+            transform: scale(0.98);
+        }
+        @media (hover: hover) {
+            .nav-link:hover {
+                background-color: #ffffff;
+                color: #000000;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+
+    <div class="w-full max-w-md space-y-4">
+        
+        <!-- Кнопка 1 -->
+        <a href="project1.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+            Проект Один
+        </a>
+
+        <!-- Кнопка 2 -->
+        <a href="project2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+            Аналитика
+        </a>
+
+        <!-- Кнопка 3 -->
+        <a href="about.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+            Обо мне
+        </a>
+
+        <!-- Кнопка 4 -->
+        <a href="docs.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+            Документация
+        </a>
+
+    </div>
+
+</body>
+</html>
