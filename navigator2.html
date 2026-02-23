@@ -71,7 +71,6 @@
 <div id="map"></div>
 <video id="noSleepVideo" playsinline loop muted style="display:none"></video>
 
-<!-- Top Right Settings -->
 <div class="top-controls">
     <div class="icon-btn" onclick="toggleSettings(); event.stopPropagation();">
         <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
@@ -140,20 +139,53 @@ async function interact() {
     if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen').catch(()=>null);
 }
 
+/**
+ * Функция воспроизведения команды. 
+ * Пытается найти файл, учитывая возможные проблемы с нормализацией Unicode 
+ * и различием между 'й' и 'и'.
+ */
 function playCommand(text) {
     if (!text) return;
+
+    // 1. Очищаем текст от мусора и приводим к нижнему регистру
+    const clean = t => t.toLowerCase()
+                       .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
+                       .trim()
+                       .replace(/\s+/g, '_');
+
+    // 2. Генерируем варианты названий файлов
+    const base = clean(text);
     
-    // Нормализация Unicode (NFC) исправляет проблему с буквой "й", 
-    // которая может быть представлена как 'и' + 'кратка'.
-    // Также очищаем лишние символы для формирования пути к файлу.
-    const normalizedText = text.normalize('NFC')
-                               .toLowerCase()
-                               .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
-                               .trim()
-                               .replace(/\s+/g, '_');
-                               
-    const path = `audio/${encodeURIComponent(normalizedText)}.mp3`;
-    new Audio(path).play().catch(e => console.warn("Audio failed", path));
+    // Варианты нормализации (NFC и NFD)
+    const variants = [
+        base.normalize('NFC'),
+        base.normalize('NFD'),
+        // Замена 'й' на 'и' (частый костыль для стабильности)
+        base.normalize('NFC').replace(/й/g, 'и'),
+        base.normalize('NFD').replace(/й/g, 'и')
+    ];
+
+    // Убираем дубликаты
+    const uniqueVariants = [...new Set(variants)];
+    
+    // Пытаемся запустить первый доступный вариант
+    const tryPlay = (index) => {
+        if (index >= uniqueVariants.length) {
+            console.warn("Все варианты имен аудиофайлов не найдены:", uniqueVariants);
+            return;
+        }
+
+        const fileName = uniqueVariants[index];
+        const path = `audio/${encodeURIComponent(fileName)}.mp3`;
+        const audio = new Audio(path);
+
+        audio.play().catch(() => {
+            // Если ошибка (файл не найден), пробуем следующий вариант
+            tryPlay(index + 1);
+        });
+    };
+
+    tryPlay(0);
 }
 
 const calcAz = (p1, p2) => {
@@ -246,7 +278,12 @@ async function loadData(url) {
     
     try {
         const res = await fetch(url);
-        pointsData = (await res.json()).map(d => ({ ...d, hex: CFG.COLORS[d.color] || d.color || '#007AFF', cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), az: d.az||0 }));
+        pointsData = (await res.json()).map(d => ({ 
+            ...d, 
+            hex: CFG.COLORS[d.color] || d.color || '#007AFF', 
+            cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), 
+            az: d.az||0 
+        }));
         currentIndex = 0; refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
         ui('navHud').classList.add('active');
