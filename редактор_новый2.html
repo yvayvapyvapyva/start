@@ -152,6 +152,10 @@ const COMMAND_SETS = {
     Brown: [
         "Выполняем остановку параллельно краю проезжей части",
         "Выполняем остановку в ближайшем разрешенном месте"
+    ],
+    Lime: [
+        "Начинаем движение",
+        "Как будете готовы начинаем движение"
     ]
 };
 
@@ -163,7 +167,8 @@ const COLORS = {
     Orange: { hex: '#FF9500', label: 'Левые и правые повороты' }, 
     Purple: { hex: '#5856D6', label: 'Параллельная парковка и гараж' }, 
     Cyan: { hex: '#5AC8FA', label: 'Разворот в ограниченном пространстве' }, 
-    Brown: { hex: '#A2845E', label: 'Остановка' } 
+    Brown: { hex: '#A2845E', label: 'Остановка' },
+    Lime: { hex: '#34C759', label: 'Начало движения' }
 };
 
 let map, points = [], cur = null, isAdd = false, curGist = null, curFile = null, pend = { color: 'Gold', cmd: '', comm: '' };
