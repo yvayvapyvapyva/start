@@ -140,52 +140,25 @@ async function interact() {
 }
 
 /**
- * Функция воспроизведения команды. 
- * Пытается найти файл, учитывая возможные проблемы с нормализацией Unicode 
- * и различием между 'й' и 'и'.
+ * Воспроизведение команды.
+ * Использует только NFC нормализацию для формирования пути.
  */
 function playCommand(text) {
     if (!text) return;
 
-    // 1. Очищаем текст от мусора и приводим к нижнему регистру
-    const clean = t => t.toLowerCase()
+    // Очистка и NFC нормализация (единый стандарт для веб-серверов)
+    const cleanName = text.toLowerCase()
+                       .normalize('NFC')
                        .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
                        .trim()
                        .replace(/\s+/g, '_');
 
-    // 2. Генерируем варианты названий файлов
-    const base = clean(text);
-    
-    // Варианты нормализации (NFC и NFD)
-    const variants = [
-        base.normalize('NFC'),
-        base.normalize('NFD'),
-        // Замена 'й' на 'и' (частый костыль для стабильности)
-        base.normalize('NFC').replace(/й/g, 'и'),
-        base.normalize('NFD').replace(/й/g, 'и')
-    ];
+    const path = `audio/${encodeURIComponent(cleanName)}.mp3`;
+    const audio = new Audio(path);
 
-    // Убираем дубликаты
-    const uniqueVariants = [...new Set(variants)];
-    
-    // Пытаемся запустить первый доступный вариант
-    const tryPlay = (index) => {
-        if (index >= uniqueVariants.length) {
-            console.warn("Все варианты имен аудиофайлов не найдены:", uniqueVariants);
-            return;
-        }
-
-        const fileName = uniqueVariants[index];
-        const path = `audio/${encodeURIComponent(fileName)}.mp3`;
-        const audio = new Audio(path);
-
-        audio.play().catch(() => {
-            // Если ошибка (файл не найден), пробуем следующий вариант
-            tryPlay(index + 1);
-        });
-    };
-
-    tryPlay(0);
+    audio.play().catch(err => {
+        console.error(`Ошибка воспроизведения [NFC]: ${path}`, err);
+    });
 }
 
 const calcAz = (p1, p2) => {
