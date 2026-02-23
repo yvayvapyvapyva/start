@@ -307,9 +307,16 @@ document.addEventListener('visibilitychange', async () => {
 
 function playCommand(text) {
     if (!text) return;
+    // Очистка текста для имени файла
     const baseName = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "").trim().replace(/\s+/g, '_');
-    const audio = new Audio(encodeURIComponent(baseName.normalize('NFD') + '.mp3'));
-    audio.play().catch(() => {});
+    // Формирование пути: ищем в папке audio/ в корне проекта
+    const fileName = baseName.normalize('NFD') + '.mp3';
+    const filePath = 'audio/' + encodeURIComponent(fileName);
+    
+    const audio = new Audio(filePath);
+    audio.play().catch((e) => {
+        console.warn("Audio play failed:", filePath, e);
+    });
 }
 
 function calcAz(p1, p2) {
@@ -357,7 +364,6 @@ function initMap(center) {
     userMarker = new ymaps.Placemark(center, {}, { iconLayout: 'default#image', iconImageSize: [40, 40], iconImageOffset: [-20, -20] });
     map.geoObjects.add(userMarker);
 
-    // Основной обработчик клика по меткам
     objectManager.events.add('click', (e) => {
         const objId = e.get('objectId');
         const p = pointsData.find(x => x.id === objId);
@@ -472,11 +478,10 @@ function refreshMap() {
     pathsCollection.removeAll();
     const currentT = pointsData[currentIndex];
     
-    // Создаем объекты БЕЗ свойства hasBalloon, чтобы не перехватывать клики
     objectManager.add(pointsData.filter((p, i) => i >= currentIndex).map(p => ({
         type: 'Feature', id: p.id,
         geometry: { type: 'Point', coordinates: [p.lat, p.lon] },
-        properties: { hintContent: p.cmd }, // Только подсказка, если нужно
+        properties: { hintContent: p.cmd },
         options: {
             iconLayout: 'default#imageWithContent',
             iconImageHref: getIcon(p.hex, `${p.id}${p.paths?.some(x=>x.comm)?'!':''}`, p.az, false, p===currentT),
