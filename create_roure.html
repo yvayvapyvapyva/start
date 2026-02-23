@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Route Editor Pro | Gist Sync</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=ru_RU&suppressMapOpenBlock=true"></script>
+    <style>
+        :root { 
+            --btn: #007AFF; 
+            --sheet-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #1d1d1f;
+            --danger: #FF3B30;
+            --success: #34C759;
+            --radius: 24px;
+            --border: rgba(0,0,0,0.1);
+        }
+        
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; background: #000; }
+        #map { position: absolute; inset: 0; z-index: 1; }
+        [class*="-copyrights-pane"], [class*="-controls-pane"] { display: none !important; }
+
+        .fab-container { position: absolute; bottom: 25px; right: 20px; z-index: 100; display: flex; flex-direction: column; gap: 12px; }
+        .fab { 
+            width: 56px; height: 56px; border-radius: 28px; background: var(--btn); color: white; border: none; 
+            font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .fab.sec { background: #fff; color: var(--text-main); }
+
+        #finishDrawBtn { 
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 2000; display: none; 
+            background: var(--success); color: white; padding: 12px 28px; border-radius: 30px; font-weight: bold; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        #mainPanel {
+            position: absolute; bottom: 0; left: 0; right: 0; z-index: 1500; background: var(--sheet-bg); backdrop-filter: blur(20px);
+            border-radius: 32px 32px 0 0; padding: 12px 20px 40px; transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 80vh; overflow-y: auto;
+        }
+        #mainPanel.active { transform: translateY(0); }
+        #mainPanel.hidden-state { transform: translateY(110%) !important; }
+
+        .sheet-handle { width: 40px; height: 5px; background: rgba(0,0,0,0.1); border-radius: 3px; margin: 0 auto 15px; cursor: pointer; }
+
+        #pathTabsContainer { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin: 15px 0; scrollbar-width: none; }
+        #pathTabsContainer::-webkit-scrollbar { display: none; }
+        .path-tab { flex: 0 0 auto; padding: 10px 20px; background: white; border: 1px solid var(--border); border-radius: 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .path-tab.active { background: var(--btn); color: white; border-color: var(--btn); }
+        .path-tab-add { border: 1px dashed var(--btn); color: var(--btn); }
+
+        .card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; box-sizing: border-box; outline: none; }
+        
+        .btn-action { 
+            background: var(--btn); color: white; border: none; border-radius: 12px; padding: 12px; 
+            font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-action.danger { background: rgba(255, 59, 48, 0.1); color: var(--danger); }
+        .btn-action.success { background: var(--success); }
+        .btn-action.sec { background: rgba(0,0,0,0.05); color: var(--text-main); }
+
+        #currentColorBtn { width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; }
+        #colorDropdown { 
+            position: absolute; top: 60px; right: 20px; background: white; border-radius: 20px; 
+            padding: 12px; display: none; grid-template-columns: repeat(5, 1fr); gap: 10px; z-index: 2001; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .swatch { width: 32px; height: 32px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+
+        #cloudModal { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { background: #fff; width: 100%; max-width: 440px; border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
+        .file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 14px; background: #f8f8f9; }
+        .file-item.active { border: 1px solid var(--btn); background: rgba(0, 122, 255, 0.05); }
+        .loading-spinner { display: none; text-align: center; padding: 10px; color: var(--btn); font-weight: 500; }
+        
+        .cmd-block { background: #f9f9f9; padding: 10px; border-radius: 12px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<button id="finishDrawBtn" onclick="toggleDraw()">✅ Завершить рисование</button>
+
+<div class="fab-container">
+    <button class="fab sec" onclick="toggleCloudModal()">📁</button>
+    <button class="fab" onclick="toggleMainPanel()">🛠️</button>
+</div>
+
+<div id="mainPanel">
+    <div class="sheet-handle" onclick="toggleMainPanel()"></div>
+    
+    <div id="editorUI" style="display:none;">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; flex-direction: column;">
+                <h2 id="pointIdDisplay" style="margin:0; font-size: 20px;">Точка #...</h2>
+                <div id="syncStatus" style="font-size: 11px; color: #888; font-weight: 600;">Локальный режим</div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn-action danger" onclick="delPoint()" style="width: 44px; height: 44px; border-radius: 50%; padding: 0;">🗑️</button>
+                <div style="position: relative;">
+                    <div id="currentColorBtn" onclick="toggleColorDropdown()"></div>
+                    <div id="colorDropdown"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="pathTabsContainer"></div>
+
+        <div id="pathEditor" style="display:none;">
+            <div class="card">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button class="btn-action" onclick="toggleDraw()" style="flex: 2;">🛤️ Рисовать путь</button>
+                    <button class="btn-action sec" onclick="addCmdRow()" style="flex: 1;">+ Фраза</button>
+                </div>
+                <div id="cmdsContainer"></div>
+                <textarea id="pathComm" placeholder="Комментарий к варианту..." style="height: 60px; margin-top: 10px;" onblur="saveFields()"></textarea>
+                <button class="btn-action danger" onclick="delPath()" style="width: 100%; margin-top: 10px; font-size: 13px;">Удалить этот вариант пути</button>
+            </div>
+            
+            <button id="saveChangesBtn" class="btn-action success" style="width:100%; display:none; margin-top: 5px;" onclick="saveToGist()">
+                💾 Сохранить изменения в Gist
+            </button>
+        </div>
+
+        <div id="noPathHint" style="text-align: center; padding: 30px; color: #888;">
+            Нажмите <b>+ Путь</b> для создания маршрута
+        </div>
+    </div>
+    
+    <div id="noPointHint" style="text-align: center; padding: 40px; color: #888;">Нажмите на карту, чтобы поставить точку</div>
+</div>
+
+<div id="cloudModal" onclick="if(event.target===this) toggleCloudModal()">
+    <div class="modal-content">
+        <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0">GitHub Gist</h3>
+            <button class="fab sec" style="width:32px; height:32px; font-size: 14px;" onclick="toggleCloudModal()">✕</button>
+        </div>
+        <div style="padding: 16px; overflow-y: auto;">
+            <input type="password" id="ghToken" placeholder="GitHub Token (Gist scope)" oninput="saveToken(this.value)" style="margin-bottom:12px">
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-action outline" style="flex:1; background: #eee; color: #333;" onclick="createNewGist()">➕ Новый Gist</button>
+                <button class="btn-action outline" style="background: #eee; color: #333;" onclick="refreshGistFiles()">🔄</button>
+            </div>
+            <div id="loader" class="loading-spinner">Загрузка...</div>
+            <div class="file-list" id="gistFileList"></div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+            <button class="btn-action danger" style="width:100%; background: none;" onclick="clearMap()">🗑️ Очистить карту</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const f6 = n => Math.round(n * 1e6) / 1e6;
+const COLORS = { 
+    Gold: '#FFD700', 
+    Blue: '#007AFF', 
+    Red: '#FF3B30', 
+    Lime: '#34C759', 
+    Fuchsia: '#AF52DE', 
+    Orange: '#FF9500', 
+    Purple: '#5856D6', 
+    Cyan: '#5AC8FA', 
+    Brown: '#A2845E', 
+    Grey: '#8E8E93' 
+};
+
+const PRESETS = ["📝", "На перекрестке повернем налево", "На перекрестке поедем прямо", "На перекрестке повернем направо", "Выполним разворот", "Найдите место для остановки"];
+
+let map, points = [], cur = null, curPathIdx = -1;
+let currentGistId = null, currentFileName = null;
+
+const getSvg = (col, txt, az, isEnd) => {
+    const s = isEnd ? 34 : 40, c = s/2;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}"><g transform="rotate(${az},${c},${c})"><polygon points="${c},2 ${s*0.75},${s-5} ${c},${s*0.65} ${s*0.25},${s-5}" fill="${col}" stroke="#000" stroke-width="1.5"/></g><circle cx="${c}" cy="${c}" r="${isEnd?7:9}" fill="${col}" stroke="#000" stroke-width="1"/><text x="${c}" y="${c+3}" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" style="paint-order:stroke fill">${txt}</text></svg>`);
+};
+
+ymaps.ready(() => {
+    map = new ymaps.Map("map", { center: [56.3399, 43.9332], zoom: 17, type: 'yandex#satellite', controls: [] });
+    map.events.add('click', e => { 
+        if(!e.get('target').geometry) selectPoint(addPoint(e.get('coords')));
+    });
+
+    const drop = document.getElementById('colorDropdown');
+    Object.entries(COLORS).forEach(([name, hex]) => {
+        const d = document.createElement('div'); d.className = 'swatch'; d.style.background = hex;
+        d.onclick = () => { 
+            if(cur) { 
+                cur.color = name; 
+                // Изменение: мгновенное обновление кнопки цвета в интерфейсе
+                document.getElementById('currentColorBtn').style.background = hex;
+                updateIcon(cur); 
+                cur.paths.forEach((p,i) => { p.line.options.set('strokeColor', hex); updatePathIcon(p, i+1); });
+            }
+            drop.style.display = 'none'; 
+        };
+        drop.appendChild(d);
+    });
+
+    const t = localStorage.getItem('gh_t_gist'); 
+    if(t) { document.getElementById('ghToken').value = t; refreshGistFiles(); }
+});
+
+function addPoint(coords) {
+    const p = { 
+        id: points.length + 1, lat: f6(coords[0]), lon: f6(coords[1]), az: 0, color: 'Gold', paths: [],
+        pm: new ymaps.Placemark(coords, {}, { draggable: true, iconLayout: 'default#imageWithContent', iconImageSize: [40,40], iconImageOffset: [-20,-20] })
+    };
+    p.pm.events.add('drag', () => {
+        const c = p.pm.geometry.getCoordinates(); p.lat = f6(c[0]); p.lon = f6(c[1]);
+        p.paths.forEach((po, i) => { let pts = po.line.geometry.getCoordinates(); pts[0] = c; po.line.geometry.setCoordinates(pts); updatePathIcon(po, i+1); });
+        syncAz(p);
+    }).add('click', () => selectPoint(p));
+    map.geoObjects.add(p.pm); points.push(p); updateIcon(p); return p;
+}
+
+function selectPoint(p) {
+    if(cur && curPathIdx !== -1) cur.paths[curPathIdx].line.editor.stopEditing();
+    points.forEach(pt => pt.paths.forEach(po => { po.line.options.set('visible', false); if(po.pmEnd) po.pmEnd.options.set('visible', false); }));
+    
+    cur = p; curPathIdx = -1;
+    document.getElementById('editorUI').style.display = p ? 'block' : 'none';
+    document.getElementById('noPointHint').style.display = p ? 'none' : 'block';
+    
+    if(p) {
+        document.getElementById('mainPanel').classList.add('active');
+        document.getElementById('pointIdDisplay').textContent = "Точка #" + p.id;
+        document.getElementById('currentColorBtn').style.background = COLORS[p.color];
+        document.getElementById('syncStatus').textContent = currentGistId ? "Gist: " + currentFileName : "Локальный режим";
+        document.getElementById('saveChangesBtn').style.display = currentGistId ? 'block' : 'none';
+        
+        p.paths.forEach(po => { po.line.options.set('visible', true); if(po.pmEnd) po.pmEnd.options.set('visible', true); updatePathIcon(po, p.paths.indexOf(po) + 1); });
+        renderTabs();
+        if(p.paths.length > 0) selectPath(0); else selectPath(-1);
+    }
+}
+
+function selectPath(idx) {
+    curPathIdx = idx;
+    const p = (idx !== -1) ? cur.paths[idx] : null;
+    document.getElementById('pathEditor').style.display = p ? 'block' : 'none';
+    document.getElementById('noPathHint').style.display = p ? 'none' : 'block';
+    if(p) {
+        document.getElementById('pathComm').value = p.comm || '';
+        document.getElementById('cmdsContainer').innerHTML = '';
+        (p.cmd || []).forEach(c => addCmdRow(c));
+    }
+    renderTabs();
+}
+
+function addNewPath() {
+    const po = { cmd: [], comm: '', az: 0, pts: [[cur.lat, cur.lon]], line: new ymaps.Polyline([[cur.lat, cur.lon]], {}, { strokeColor: COLORS[cur.color], strokeWidth: 5, strokeOpacity: 0.8 }) };
+    po.line.geometry.events.add('change', () => {
+        po.pts = po.line.geometry.getCoordinates().map(c => [f6(c[0]), f6(c[1])]);
+        updatePathIcon(po, cur.paths.indexOf(po) + 1); syncAz(cur);
+    });
+    map.geoObjects.add(po.line); cur.paths.push(po); selectPath(cur.paths.length - 1);
+}
+
+function addCmdRow(val = "") {
+    const b = document.createElement('div'); b.className = 'cmd-block';
+    b.innerHTML = `<select style="flex:0 0 44px">${PRESETS.map(p=>`<option value="${p==='📝'?'':p}">${p}</option>`).join('')}</select>
+                   <input class="ci" value="${val}" placeholder="Команда...">
+                   <button onclick="this.parentElement.remove(); saveFields();" style="border:none; background:none; color:red; font-size:18px;">&times;</button>`;
+    const s = b.querySelector('select'), i = b.querySelector('.ci');
+    s.onchange = () => { if(s.value) { i.value = s.value; saveFields(); s.selectedIndex = 0; } };
+    i.onblur = saveFields;
+    document.getElementById('cmdsContainer').appendChild(b);
+}
+
+function toggleDraw() {
+    const ed = cur.paths[curPathIdx].line.editor;
+    const isEd = ed.state.get('editing');
+    if(!isEd) ed.startDrawing(); else ed.stopEditing();
+    document.getElementById('mainPanel').classList.toggle('hidden-state', !isEd);
+    document.getElementById('finishDrawBtn').style.display = !isEd ? 'block' : 'none';
+}
+
+function updateIcon(p) { p.pm.options.set('iconImageHref', getSvg(COLORS[p.color], p.id, p.az, false)); }
+function updatePathIcon(po, num) {
+    const pts = po.line.geometry.getCoordinates(); if(!pts.length) return;
+    const last = pts[pts.length-1], prev = pts[pts.length-2];
+    po.az = prev ? calcAngle(prev, last) : 0;
+    if(!po.pmEnd) {
+        po.pmEnd = new ymaps.Placemark(last, {}, { iconLayout: 'default#imageWithContent', iconImageSize: [34,34], iconImageOffset: [-17,-17], interactive: false });
+        map.geoObjects.add(po.pmEnd);
+    } else po.pmEnd.geometry.setCoordinates(last);
+    po.pmEnd.options.set({ iconImageHref: getSvg(COLORS[cur.color], num, po.az, true), visible: po.line.options.get('visible') });
+}
+
+function renderTabs() {
+    const c = document.getElementById('pathTabsContainer'); c.innerHTML = '';
+    cur.paths.forEach((_, i) => {
+        const t = document.createElement('div'); t.className = `path-tab ${curPathIdx===i?'active':''}`;
+        t.textContent = `Вариант ${i+1}`; t.onclick = () => selectPath(i); c.appendChild(t);
+    });
+    const b = document.createElement('div'); b.className = 'path-tab path-tab-add'; b.textContent = '+ Путь'; b.onclick = addNewPath; c.appendChild(b);
+}
+
+function saveFields() { if(cur && curPathIdx!==-1) { const p = cur.paths[curPathIdx]; p.cmd = Array.from(document.querySelectorAll('.ci')).map(i=>i.value.trim()).filter(v=>v); p.comm = document.getElementById('pathComm').value.trim(); } }
+function toggleMainPanel() { document.getElementById('mainPanel').classList.toggle('active'); }
+function toggleCloudModal() { const m = document.getElementById('cloudModal'); m.style.display = (m.style.display==='flex'?'none':'flex'); }
+function toggleColorDropdown() { const d = document.getElementById('colorDropdown'); d.style.display = d.style.display==='grid'?'none':'grid'; }
+const calcAngle = (p1, p2) => {
+    const dy = p2[0]-p1[0], dx = Math.cos(Math.PI/180*p1[0])*(p2[1]-p1[1]);
+    return Math.round((Math.atan2(dx, dy)*180/Math.PI+360)%360);
+};
+function syncAz(p) { if(p.paths[0]?.pts.length >= 2) { p.az = calcAngle(p.paths[0].pts[0], p.paths[0].pts[1]); updateIcon(p); } }
+
+function delPoint() { if(!cur) return; cur.paths.forEach(p=>{ map.geoObjects.remove(p.line); if(p.pmEnd) map.geoObjects.remove(p.pmEnd); }); map.geoObjects.remove(cur.pm); points = points.filter(p=>p!==cur); points.forEach((p, i) => { p.id = i+1; updateIcon(p); }); selectPoint(null); }
+function delPath() { if(curPathIdx===-1) return; const p = cur.paths[curPathIdx]; map.geoObjects.remove(p.line); if(p.pmEnd) map.geoObjects.remove(p.pmEnd); cur.paths.splice(curPathIdx,1); selectPath(cur.paths.length?0:-1); }
+
+function clearMap() { if(confirm("Очистить всё?")) { points.forEach(p => { p.paths.forEach(pa=>{ map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); map.geoObjects.remove(p.pm); }); points = []; cur = null; currentGistId = null; currentFileName = null; selectPoint(null); toggleCloudModal(); } }
+
+function stringify(data) { 
+    return JSON.stringify(data, (key, value) => {
+        if (key === 'pts' && Array.isArray(value)) return `__PTS__${JSON.stringify(value)}__`;
+        return value;
+    }, 2).replace(/"__PTS__(.*?)__"/g, '$1');
+}
+
+function getCleanData() {
+    saveFields();
+    return points.map((p, i) => ({
+        id: i + 1, lat: p.lat, lon: p.lon, az: p.az, color: p.color,
+        paths: p.paths.map(pa => {
+            const item = { pts: pa.pts };
+            if (pa.cmd?.length) item.cmd = pa.cmd;
+            if (pa.comm) item.comm = pa.comm;
+            if (pa.az) item.az = pa.az;
+            return item;
+        })
+    }));
+}
+
+const gistApi = (path, method = 'GET', body = null) => {
+    const t = document.getElementById('ghToken').value; 
+    if(!t) throw new Error("Токен не указан");
+    document.getElementById('loader').style.display = 'block';
+    return fetch(`https://api.github.com/${path}`, { method, headers: { 'Authorization': `token ${t}` }, body: body ? JSON.stringify(body) : null })
+    .then(async r => {
+        document.getElementById('loader').style.display = 'none';
+        if(r.status === 204) return true;
+        if(!r.ok) { const e = await r.json(); throw new Error(e.message); }
+        return r.json();
+    }).catch(e => { document.getElementById('loader').style.display = 'none'; alert(e.message); throw e; });
+};
+
+async function refreshGistFiles() {
+    try {
+        const gists = await gistApi('gists');
+        const container = document.getElementById('gistFileList'); container.innerHTML = '';
+        gists.forEach(g => {
+            Object.keys(g.files).forEach(fn => {
+                if(fn.endsWith('.json')) {
+                    const div = document.createElement('div');
+                    div.className = `file-item ${g.id === currentGistId ? 'active' : ''}`;
+                    div.innerHTML = `<div onclick="loadGistFile('${g.id}', '${fn}')" style="flex:1; cursor:pointer"><b>${fn}</b><br><small>${new Date(g.updated_at).toLocaleDateString()}</small></div>
+                                     <button onclick="deleteGist('${g.id}')" style="border:none; background:none; color:red">🗑️</button>`;
+                    container.appendChild(div);
+                }
+            });
+        });
+    } catch(e) {}
+}
+
+async function loadGistFile(gid, fn) {
+    try {
+        const g = await gistApi(`gists/${gid}`);
+        const json = JSON.parse(g.files[fn].content);
+        
+        points.forEach(p => { p.paths.forEach(pa=>{ map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); map.geoObjects.remove(p.pm); });
+        points = [];
+        
+        json.forEach((d, idx) => {
+            const p = addPoint([d.lat, d.lon]);
+            p.id = idx + 1; p.az = d.az || 0; p.color = d.color || 'Gold';
+            p.paths = (d.paths || []).map(pa => {
+                const po = { ...pa, line: new ymaps.Polyline(pa.pts, {}, { strokeColor: COLORS[p.color], strokeWidth: 5, strokeOpacity: 0.8, visible: false }) };
+                po.line.geometry.events.add('change', () => { po.pts = po.line.geometry.getCoordinates().map(c => [f6(c[0]), f6(c[1])]); updatePathIcon(po, p.paths.indexOf(po) + 1); syncAz(p); });
+                map.geoObjects.add(po.line); return po;
+            });
+            updateIcon(p);
+        });
+        
+        currentGistId = gid; currentFileName = fn;
+        selectPoint(null); toggleCloudModal(); refreshGistFiles();
+    } catch(e) {}
+}
+
+async function saveToGist() {
+    if(!currentGistId) return;
+    try {
+        await gistApi(`gists/${currentGistId}`, 'PATCH', { files: { [currentFileName]: { content: stringify(getCleanData()) } } });
+        alert("Сохранено!");
+    } catch(e) {}
+}
+
+async function createNewGist() {
+    let fn = prompt("Имя файла:", "route"); if(!fn) return;
+    if(!fn.endsWith('.json')) fn += ".json";
+    try {
+        const res = await gistApi('gists', 'POST', { public: true, files: { [fn]: { content: stringify(getCleanData()) } } });
+        currentGistId = res.id; currentFileName = fn;
+        refreshGistFiles(); toggleCloudModal(); selectPoint(null);
+    } catch(e) {}
+}
+
+async function deleteGist(id) { if(confirm("Удалить Gist?")) { await gistApi(`gists/${id}`, 'DELETE'); if(id === currentGistId) { currentGistId = null; currentFileName = null; } refreshGistFiles(); } }
+function saveToken(v) { localStorage.setItem('gh_t_gist', v); if(v.length > 30) refreshGistFiles(); }
+</script>
+</body>
+</html>
