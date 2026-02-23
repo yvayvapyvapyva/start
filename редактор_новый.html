@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Route Editor Pro | Optimized</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=ru_RU&suppressMapOpenBlock=true"></script>
+    <style>
+        :root { --btn: #007AFF; --text: #1d1d1f; --danger: #FF3B30; --success: #34C759; --radius: 24px; --border: rgba(0,0,0,0.1); }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #000; -webkit-tap-highlight-color: transparent; }
+        #map { position: absolute; inset: 0; z-index: 1; }
+        [class*="-copyrights-pane"], [class*="-controls-pane"] { display: none !important; }
+        .top-controls { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; }
+        .btn-top { background: var(--success); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: 600; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); cursor: pointer; display: none; }
+        .bottom-center-controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; }
+        .btn-add-main { background: var(--btn); color: #fff; padding: 14px 28px; border-radius: 30px; font-weight: 600; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 16px; transition: 0.2s; }
+        .btn-add-main.active { background: var(--danger); }
+        .fab-container { position: absolute; bottom: 30px; right: 20px; z-index: 100; }
+        .fab-mini { width: 50px; height: 50px; border-radius: 25px; background: #fff; border: none; font-size: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
+        .modal-content { background: #fff; width: 100%; max-width: 440px; border-radius: var(--radius); display: flex; flex-direction: column; max-height: 85vh; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .btn-action { background: var(--btn); color: #fff; border: none; border-radius: 14px; padding: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; }
+        .btn-action.danger { background: rgba(255, 59, 48, 0.1); color: var(--danger); }
+        .btn-action.sec { background: #f0f0f2; color: #333; }
+        .editor-section { padding: 20px; overflow-y: auto; }
+        input, textarea { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; box-sizing: border-box; outline: none; margin-bottom: 12px; background: #f9f9fb; }
+        .gist-item { padding: 14px; border-radius: 16px; background: #f9f9fb; margin-bottom: 10px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .gist-item.active { border-color: var(--btn); background: #eef7ff; }
+        .btn-delete-gist { background: none; border: none; color: var(--danger); font-size: 20px; padding: 10px; }
+        .color-preview-circle { width: 44px; height: 44px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer; }
+        .color-dropdown { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 28px; padding: 12px; display: none; flex-direction: column; gap: 4px; z-index: 6000; box-shadow: 0 30px 100px rgba(0,0,0,0.5); width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; }
+        .dropdown-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 5999; display: none; backdrop-filter: blur(2px); }
+        .color-row { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 18px; cursor: pointer; }
+        .color-row:hover { background: #f5f5f7; }
+        .swatch { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(0,0,0,0.05); }
+        .color-label { font-size: 16px; font-weight: 600; color: var(--text); }
+        #syncStatus { font-size: 13px; color: var(--success); text-align: center; font-weight: 600; margin-top: 10px; }
+        .hidden { display: none !important; }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div class="top-controls"><button id="finishDrawBtn" class="btn-top" onclick="stopDrawingMode()">✅ Завершить редактирование</button></div>
+<div class="bottom-center-controls"><button id="addMarkerBtn" class="btn-add-main" onclick="openCreateModal()"><span id="addIcon" style="font-size:24px">+</span><span id="addText">Добавить точку</span></button></div>
+<div class="fab-container"><button class="fab-mini" onclick="toggleM('cloudModal')">📁</button></div>
+<div id="dropdownOverlay" class="dropdown-overlay" onclick="closeD()"></div>
+
+<!-- Модальные окна -->
+<div id="cloudModal" class="modal" onclick="if(event.target===this) toggleM('cloudModal')">
+    <div class="modal-content">
+        <div class="modal-header"><h3>GitHub Gist Sync</h3><button class="fab-mini" style="width:36px;height:36px;font-size:14px" onclick="toggleM('cloudModal')">✕</button></div>
+        <div class="editor-section">
+            <input type="password" id="ghToken" placeholder="Введите GitHub Token..." oninput="saveToken(this.value)">
+            <div id="curFile" style="font-size:13px;margin-bottom:15px;color:var(--btn);font-weight:600;display:none;background:#eef7ff;padding:10px;border-radius:10px">📍 Активный файл: <span id="actFileName"></span></div>
+            <div style="display:flex;gap:10px;margin-bottom:15px">
+                <button class="btn-action" style="background:var(--success)" id="saveBtn" onclick="saveGist()">💾 Сохранить</button>
+                <button class="btn-action sec" onclick="createGist()">➕ Новый</button>
+                <button class="btn-action sec" style="flex:0.3" onclick="refreshGists()">🔄</button>
+            </div>
+            <div id="gistList"></div>
+            <div id="syncStatus"></div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <button class="btn-action danger" style="width:100%;background:none" onclick="clearMap()">🗑️ Очистить карту</button>
+        </div>
+    </div>
+</div>
+
+<div id="createPointModal" class="modal" onclick="if(event.target===this) toggleM('createPointModal')">
+    <div class="modal-content">
+        <div class="modal-header"><h3>Новая точка</h3><div id="newColorBtn" class="color-preview-circle" onclick="toggleD('newColorDropdown')"></div><button class="fab-mini" style="width:36px;height:36px;font-size:14px" onclick="toggleM('createPointModal')">✕</button></div>
+        <div class="editor-section">
+            <input type="text" id="newCmd" placeholder="Команда">
+            <textarea id="newComm" rows="3" placeholder="Комментарий"></textarea>
+            <button class="btn-action" style="background:var(--success);width:100%" onclick="confirmP()">📍 Установить на карту</button>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal" onclick="if(event.target===this) { applyChanges(); toggleM('editModal'); }">
+    <div class="modal-content">
+        <div class="modal-header"><h3 id="editTitle">Настройки</h3><div id="editColorBtn" class="color-preview-circle" onclick="toggleD('editColorDropdown')"></div><button class="fab-mini" style="width:36px;height:36px;font-size:14px" onclick="applyChanges(); toggleM('editModal')">✕</button></div>
+        <div class="editor-section">
+            <input type="text" id="editCmd" placeholder="Команда" oninput="applyChanges()">
+            <textarea id="editComm" rows="3" placeholder="Комментарий" oninput="applyChanges()"></textarea>
+            <div style="display:flex;gap:10px;margin-top:5px">
+                <button class="btn-action" onclick="applyChanges(); startEditPath()">🛤️ Путь</button>
+                <button class="btn-action danger" onclick="delP()">🗑️ Удалить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="newColorDropdown" class="color-dropdown"></div>
+<div id="editColorDropdown" class="color-dropdown"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const f6 = n => Math.round(n * 1e6) / 1e6;
+const COLORS = { 
+    Gold: { hex: '#FFD700', label: 'Маневры на перекрестке' }, Blue: { hex: '#007AFF', label: 'Разворот вне перекрестка' }, 
+    Red: { hex: '#FF3B30', label: 'Разгон до максимальной скорости' }, Fuchsia: { hex: '#AF52DE', label: 'Остановка и начало движения' }, 
+    Orange: { hex: '#FF9500', label: 'Левые и правые повороты' }, Purple: { hex: '#5856D6', label: 'Парковка и гараж' }, 
+    Cyan: { hex: '#5AC8FA', label: 'Разворот в огранич. пространстве' }, Brown: { hex: '#A2845E', label: 'Остановка' } 
+};
+
+let map, points = [], cur = null, isAdd = false, curGist = null, curFile = null, pend = { color: 'Gold', cmd: '', comm: '' };
+
+const getSvg = (col, txt, az, isEnd) => {
+    const s = isEnd ? 34 : 40, c = s/2;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}"><g transform="rotate(${az},${c},${c})"><polygon points="${c},2 ${s*0.75},${s-5} ${c},${s*0.65} ${s*0.25},${s-5}" fill="${col}" stroke="#000" stroke-width="1.5"/></g><circle cx="${c}" cy="${c}" r="${isEnd?7:9}" fill="${col}" stroke="#000" stroke-width="1"/><text x="${c}" y="${c+3}" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" style="paint-order:stroke fill">${txt}</text></svg>`);
+};
+
+ymaps.ready(() => {
+    map = new ymaps.Map("map", { center: [56.3399, 43.9332], zoom: 17, type: 'yandex#satellite', controls: [] });
+    map.events.add('click', e => { 
+        if(isAdd) { 
+            const p = addP(e.get('coords'), { color: pend.color, initialPath: { cmd: pend.cmd ? [pend.cmd] : [], comm: pend.comm } });
+            startDrawingForPoint(p);
+        } 
+    });
+    initD('newColorDropdown', 'newColorBtn', (h, n) => pend.color = n);
+    initD('editColorDropdown', 'editColorBtn', (h, n) => { if(cur) { cur.color = n; applyChanges(); } });
+    const t = localStorage.getItem('gh_t_gist'); if(t) { $('ghToken').value = t; refreshGists(); }
+});
+
+const initD = (did, bid, cb) => {
+    const dr = $(did), bt = $(bid);
+    Object.entries(COLORS).forEach(([n, d]) => {
+        const r = Object.assign(document.createElement('div'), { className: 'color-row', onclick: (e) => { e.stopPropagation(); bt.style.background = d.hex; cb(d.hex, n); closeD(); } });
+        r.innerHTML = `<div class="swatch" style="background:${d.hex}"></div><div class="color-label">${d.label}</div>`;
+        dr.appendChild(r);
+    });
+};
+
+const toggleD = id => { const d = $(id), vis = d.style.display === 'flex'; closeD(); if(!vis) { d.style.display = 'flex'; $('dropdownOverlay').style.display = 'block'; } };
+const closeD = () => { document.querySelectorAll('.color-dropdown').forEach(dr => dr.style.display = 'none'); $('dropdownOverlay').style.display = 'none'; };
+const toggleM = id => { const m = $(id); m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none'; };
+
+const openCreateModal = () => { if(isAdd) return stopAdd(); ['newCmd', 'newComm'].forEach(i => $(i).value = ''); pend = { color: 'Gold', cmd: '', comm: '' }; $('newColorBtn').style.background = COLORS.Gold.hex; closeD(); toggleM('createPointModal'); };
+const confirmP = () => { pend.cmd = $('newCmd').value.trim(); pend.comm = $('newComm').value.trim(); toggleM('createPointModal'); isAdd = true; $('addIcon').textContent = "✕"; $('addText').textContent = "Отмена"; $('addMarkerBtn').classList.add('active'); map.setCursor('crosshair'); };
+const stopAdd = () => { isAdd = false; $('addIcon').textContent = "+"; $('addText').textContent = "Добавить точку"; $('addMarkerBtn').classList.remove('active'); map.setCursor('grab'); };
+
+const startDrawingForPoint = p => {
+    isAdd = false;
+    document.querySelector('.bottom-center-controls').classList.add('hidden');
+    $('finishDrawBtn').style.display = 'block';
+    cur = p;
+    const line = cur.paths[0].line;
+    line.editor.startDrawing();
+    p.pm.options.set('draggable', true);
+    line.editor.options.set('vertexDraggable', (idx) => idx !== 0);
+};
+
+function addP(coords, data = null) {
+    const p = { 
+        id: data?.id || (points.length + 1), lat: f6(coords[0]), lon: f6(coords[1]), az: data?.az || 0, color: data?.color || 'Gold', paths: [], 
+        pm: new ymaps.Placemark(coords, {}, { draggable: false, iconLayout: 'default#imageWithContent', iconImageSize: [40,40], iconImageOffset: [-20,-20], zIndex: 1000 }) 
+    };
+    p.pm.geometry.events.add('change', () => {
+        const nc = p.pm.geometry.getCoordinates(); p.lat = f6(nc[0]); p.lon = f6(nc[1]);
+        p.paths.forEach(po => { if(po.line) { const pts = po.line.geometry.getCoordinates(); if(pts.length) { pts[0] = nc; po.line.geometry.setCoordinates(pts); if(pts.length >= 2) p.az = calcA(pts[0], pts[1]); } } });
+        updI(p);
+    });
+    p.pm.events.add('click', () => { if(!isAdd && !$('finishDrawBtn').style.display.includes('block')) openEdit(p); });
+    map.geoObjects.add(p.pm); points.push(p); updI(p);
+    if(data?.initialPath || !data?.id) { cur = p; addPath(data?.initialPath); }
+    return p;
+}
+
+const stopDrawingMode = () => { 
+    if(!cur) return; 
+    cur.pm.options.set('draggable', false); 
+    if(cur.paths[0]?.line) {
+        cur.paths[0].line.editor.stopEditing();
+        cur.paths[0].line.editor.options.set('vertexDraggable', true);
+    } 
+    document.querySelector('.bottom-center-controls').classList.remove('hidden'); 
+    $('addIcon').textContent = "+";
+    $('addText').textContent = "Добавить точку";
+    $('addMarkerBtn').classList.remove('active');
+    $('finishDrawBtn').style.display = 'none'; 
+    map.setCursor('grab'); cur = null; 
+};
+
+const openEdit = p => { cur = p; const pa = p.paths[0] || { cmd: [], comm: '' }; $('editTitle').textContent = `Метка #${p.id}`; $('editComm').value = pa.comm || ''; $('editCmd').value = pa.cmd?.[0] || ''; $('editColorBtn').style.background = COLORS[p.color].hex; closeD(); toggleM('editModal'); };
+
+function applyChanges() {
+    if(!cur) return; const pa = cur.paths[0];
+    if(pa) { 
+        pa.comm = $('editComm').value; 
+        const v = $('editCmd').value.trim(); 
+        pa.cmd = v ? [v] : []; 
+        pa.line.options.set('strokeColor', COLORS[cur.color].hex); 
+        if(pa.pmEnd) updPI(pa, 1); 
+    }
+    updI(cur);
+}
+
+const startEditPath = () => { 
+    const p = cur; toggleM('editModal'); 
+    p.pm.options.set('draggable', true); 
+    document.querySelector('.bottom-center-controls').classList.add('hidden'); 
+    $('finishDrawBtn').style.display = 'block'; 
+    if(p.paths[0]?.line) {
+        p.paths[0].line.editor.startEditing();
+        p.paths[0].line.editor.options.set('vertexDraggable', (idx) => idx !== 0);
+    }
+};
+
+const delP = () => { if(!confirm("Удалить?")) return; points = points.filter(p => p !== cur); map.geoObjects.remove(cur.pm); cur.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); points.forEach((p, i) => { p.id = i+1; updI(p); }); toggleM('editModal'); cur = null; };
+
+function addPath(data = null) {
+    const sp = data?.pts ? data.pts[0] : [cur.lat, cur.lon], po = { 
+        cmd: data?.cmd || [], comm: data?.comm || '', az: data?.az || 0, pts: data?.pts || [sp], 
+        line: new ymaps.Polyline(data?.pts || [sp], {}, { strokeColor: COLORS[cur.color].hex, strokeWidth: 5, strokeOpacity: 0.8, zIndex: 500 }) 
+    };
+    po.line.geometry.events.add('change', () => {
+        const c = po.line.geometry.getCoordinates(); po.pts = c.map(pt => [f6(pt[0]), f6(pt[1])]);
+        const o = points.find(p => p.paths.includes(po));
+        if(o) { 
+            updPI(po, o.paths.indexOf(po) + 1); 
+            if(c.length && (f6(c[0][0]) !== o.lat || f6(c[0][1]) !== o.lon)) o.pm.geometry.setCoordinates(c[0]);
+            if(c.length >= 2) { o.az = calcA(c[0], c[1]); updI(o); } 
+        }
+    });
+    map.geoObjects.add(po.line); cur.paths.push(po); if(data?.pts) updPI(po, cur.paths.length);
+}
+
+const updI = p => p.pm.options.set('iconImageHref', getSvg(COLORS[p.color].hex, p.id, p.az, false));
+const calcA = (p1, p2) => Math.round((Math.atan2(Math.cos(Math.PI/180*p1[0])*(p2[1]-p1[1]), p2[0]-p1[0])*180/Math.PI+360)%360);
+
+function updPI(po, num) {
+    const pts = po.line.geometry.getCoordinates(); if(!pts.length) return;
+    const last = pts[pts.length-1], prev = pts[pts.length-2]; po.az = prev ? calcA(prev, last) : 0;
+    const o = points.find(p => p.paths.includes(po)), col = o ? COLORS[o.color].hex : '#000';
+    if(!po.pmEnd) { po.pmEnd = new ymaps.Placemark(last, {}, { iconLayout: 'default#imageWithContent', iconImageSize: [34,34], iconImageOffset: [-17,-17], interactive: false, zIndex: 800 }); map.geoObjects.add(po.pmEnd); } 
+    else po.pmEnd.geometry.setCoordinates(last);
+    po.pmEnd.options.set({ iconImageHref: getSvg(col, num, po.az, true) });
+}
+
+const saveToken = v => localStorage.setItem('gh_t_gist', v);
+const clearMap = () => { if(!confirm("Очистить?")) return; points.forEach(p => { map.geoObjects.remove(p.pm); p.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); }); points = []; curGist = curFile = null; updGUI(); };
+
+const api = async (u, m = 'GET', b = null) => {
+    const t = $('ghToken').value; if(!t) return null;
+    const r = await fetch(u, { method: m, headers: { Authorization: `token ${t}`, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : null });
+    return r.ok || r.status === 204 ? (r.status !== 204 ? r.json() : true) : null;
+};
+
+async function refreshGists() {
+    const gs = await api('https://api.github.com/gists'); if(!gs) return showS("Ошибка");
+    const l = $('gistList'); l.innerHTML = '';
+    gs.forEach(g => Object.keys(g.files).forEach(f => {
+        if(f.endsWith('.json')) {
+            const it = Object.assign(document.createElement('div'), { className: `gist-item${curGist === g.id && curFile === f ? ' active' : ''}`, onclick: () => loadGist(g.id, f) });
+            it.innerHTML = `<div><span>${f}</span><br><small style="color:#888">${g.id.slice(0,8)}</small></div><button class="btn-delete-gist" onclick="event.stopPropagation(); delGist('${g.id}','${f}')">🗑️</button>`;
+            l.appendChild(it);
+        }
+    }));
+}
+
+async function delGist(id, fn) { if(confirm(`Удалить ${fn}?`) && await api(`https://api.github.com/gists/${id}`, 'DELETE')) { if(curGist === id) { curGist = curFile = null; updGUI(); } showS("Удалено"); refreshGists(); } }
+async function createGist() { const n = prompt("Имя файла:", "route.json"); if(!n) return; const fn = n.endsWith('.json') ? n : n + '.json', r = await api('https://api.github.com/gists', 'POST', { public: true, files: { [fn]: { content: "[]" } } }); if(r) { curGist = r.id; curFile = fn; await saveGist(); refreshGists(); updGUI(); toggleM('cloudModal'); } }
+async function loadGist(id, fn) {
+    const r = await api(`https://api.github.com/gists/${id}`); if(!r) return;
+    const data = JSON.parse(r.files[fn].content);
+    points.forEach(p => { map.geoObjects.remove(p.pm); p.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); });
+    points = []; curGist = id; curFile = fn;
+    data.forEach((dp) => { 
+        const p = addP([dp.lat, dp.lon], { id: dp.id, az: dp.az, color: dp.color }); 
+        dp.paths.forEach(dpa => { cur = p; addPath(dpa); }); 
+        updI(p); 
+    });
+    if(points.length) map.setCenter([points[0].lat, points[0].lon]); updGUI(); toggleM('cloudModal'); showS("Загружено");
+}
+
+async function saveGist() {
+    if(!curGist) return;
+    // Формирование структуры JSON с полями cmd и comm
+    const data = points.map(p => ({ 
+        id: p.id, 
+        lat: p.lat, 
+        lon: p.lon, 
+        az: p.az, 
+        color: p.color, 
+        paths: p.paths.map(pa => ({ 
+            pts: pa.pts, 
+            cmd: pa.cmd, // массив команд
+            comm: pa.comm || "", // комментарий строкой
+            az: pa.az 
+        })) 
+    }));
+    if(await api(`https://api.github.com/gists/${curGist}`, 'PATCH', { files: { [curFile]: { content: JSON.stringify(data, null, 2) } } })) { showS("Сохранено!"); refreshGists(); }
+}
+
+const updGUI = () => { $('curFile').style.display = curFile ? 'block' : 'none'; if(curFile) $('actFileName').textContent = curFile; $('saveBtn').disabled = !curFile; };
+const showS = t => { const s = $('syncStatus'); s.textContent = t; setTimeout(() => { if(s.textContent === t) s.textContent = ''; }, 3000); };
+</script>
+</body>
+</html>
