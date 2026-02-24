@@ -12,17 +12,14 @@
         #map { position: absolute; inset: 0; z-index: 1; touch-action: auto; }
         [class*="-copyrights-pane"], [class*="-map-copyrights-promo"], [class*="-controls-pane"] { display: none !important; }
         
-        /* Top Controls */
         .top-controls { position: absolute; top: 16px; right: 16px; z-index: 9005; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .icon-btn { pointer-events: auto; width: 48px; height: 48px; border-radius: 14px; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
         .icon-btn svg { fill: white; width: 24px; }
 
-        /* Settings Panel */
         #settingsOverlay { position: absolute; top: 74px; right: 16px; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #333; }
         .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; font-family: inherit; background: white; }
 
-        /* Bottom UI */
         .bottom-ui-wrapper { position: absolute; bottom: 30px; left: 16px; right: 16px; z-index: 9000; display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; pointer-events: none; }
         #navHud, #selectionHud { flex: 1; background: rgba(0,0,0,0.85); backdrop-filter: var(--panel-blur); border-radius: 18px; padding: 14px; color: white; display: none; flex-direction: column; gap: 6px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.4); pointer-events: auto; max-width: calc(100% - 80px); }
         #navHud.active, #selectionHud.active { display: flex; }
@@ -30,7 +27,6 @@
         .hud-actions { display: flex; gap: 8px; margin-top: 8px; }
         .hud-btn { flex: 1; padding: 10px; border-radius: 10px; border: none; background: var(--btn); color: white; font-weight: 700; font-size: 13px; cursor: pointer; }
         
-        /* Menu & List */
         #filterMenu { position: absolute; bottom: 60px; right: 0; pointer-events: auto; background: var(--sheet-bg); border-radius: 20px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); min-width: 280px; max-width: calc(100vw - 40px); max-height: 70vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .menu-header { padding: 12px; background: #f9f9f9; border-bottom: 1px solid rgba(0,0,0,0.08); }
         #pointsList { overflow-y: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -61,13 +57,18 @@
         .map-btn.active { background: var(--btn); }
 
         .source-select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); font-size: 13px; background: white; font-weight: 600; }
-        .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
+        .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; gap: 15px; }
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .progress-bar { width: 200px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+        .progress-fill { width: 0%; height: 100%; background: var(--btn); transition: width 0.3s; }
         .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
     </style>
 </head>
 <body onclick="interact()">
-<div id="loading" class="loading-overlay">Инициализация...</div>
+<div id="loading" class="loading-overlay">
+    <div id="loadingText">Инициализация...</div>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+</div>
 <div id="map"></div>
 <video id="noSleepVideo" playsinline loop muted style="display:none"></video>
 
@@ -137,13 +138,14 @@ const CFG = {
 };
 
 let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, wakeLock=null, audioInit=false;
-let globalAudio = new Audio(); // Переиспользуемый объект аудио
+let globalAudio = new Audio();
+let audioCache = new Map(); // Хранилище блоб-ссылок на аудио файлы
 
 const ui = id => document.getElementById(id);
 
 async function interact() {
     if (!audioInit) { 
-        globalAudio.play().catch(() => {}); // Прогрев аудио-контекста
+        globalAudio.play().catch(() => {});
         audioInit = true; 
     }
     const v = ui('noSleepVideo');
@@ -151,32 +153,60 @@ async function interact() {
     if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen').catch(()=>null);
 }
 
+function getAudioPath(text) {
+    if (!text) return null;
+    const cleanName = text.toLowerCase().normalize('NFC').replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "").trim().replace(/\s+/g, '_');
+    return `audio/${encodeURIComponent(cleanName)}.mp3`;
+}
+
 /**
- * Воспроизведение команды.
- * Использует глобальный объект для обхода ограничений браузера.
+ * Скачивает все аудиофайлы маршрута и сохраняет их как Blob URL
  */
+async function preloadAllAudio(points) {
+    const uniqueCommands = [...new Set(points.map(p => p.cmd))];
+    let loaded = 0;
+    const total = uniqueCommands.length;
+    
+    ui('loadingText').innerText = `Загрузка аудио (0/${total})...`;
+    ui('progressFill').style.width = '0%';
+    
+    // Очищаем старый кэш
+    audioCache.forEach(url => URL.revokeObjectURL(url));
+    audioCache.clear();
+
+    const fetchAudio = async (cmd) => {
+        const path = getAudioPath(cmd);
+        try {
+            const response = await fetch(path);
+            if (!response.ok) throw new Error();
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            audioCache.set(cmd, url);
+        } catch (e) {
+            console.warn(`Не удалось загрузить: ${cmd}`);
+        }
+        loaded++;
+        const pct = (loaded / total) * 100;
+        ui('loadingText').innerText = `Загрузка аудио (${loaded}/${total})...`;
+        ui('progressFill').style.width = `${pct}%`;
+    };
+
+    // Загружаем параллельно
+    await Promise.all(uniqueCommands.map(fetchAudio));
+}
+
 function playCommand(text) {
-    if (!text) return;
-
-    const cleanName = text.toLowerCase()
-                       .normalize('NFC')
-                       .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
-                       .trim()
-                       .replace(/\s+/g, '_');
-
-    const path = `audio/${encodeURIComponent(cleanName)}.mp3`;
+    const cachedUrl = audioCache.get(text);
+    const source = cachedUrl || getAudioPath(text); // Если нет в кэше, пробуем напрямую
+    
+    if (!source) return;
     
     globalAudio.pause();
-    globalAudio.src = path;
-    globalAudio.load();
-
-    const playPromise = globalAudio.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(err => {
-            console.error(`Ошибка воспроизведения: ${path}`, err);
-            ui('hudCmd').innerText = "⚠️ Нажмите для звука";
-        });
-    }
+    globalAudio.src = source;
+    globalAudio.play().catch(err => {
+        console.error(`Ошибка воспроизведения: ${text}`, err);
+        ui('hudCmd').innerText = "⚠️ Нажмите для звука";
+    });
 }
 
 const calcAz = (p1, p2) => {
@@ -261,12 +291,14 @@ async function fetchGists() {
 }
 
 async function loadData(url) {
-    ui('loading').innerText = "Загрузка..."; ui('loading').classList.remove('hidden');
+    ui('loadingText').innerText = "Загрузка маршрута...";
+    ui('progressFill').style.width = '0%';
+    ui('loading').classList.remove('hidden');
+    
     iconCache.clear();
     objectManager.removeAll();
     pathsCollection.removeAll();
-    previewPathsCollection.removeAll();
-    window.lastPlayedIndex = -1; // Сброс трекера при загрузке нового маршрута
+    window.lastPlayedIndex = -1;
     
     try {
         const res = await fetch(url);
@@ -276,7 +308,12 @@ async function loadData(url) {
             cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), 
             az: d.az||0 
         }));
-        currentIndex = 0; refreshMap();
+
+        // Массовое скачивание аудио
+        await preloadAllAudio(pointsData);
+
+        currentIndex = 0; 
+        refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
         ui('navHud').classList.add('active');
     } finally { ui('loading').classList.add('hidden'); }
@@ -301,7 +338,7 @@ function refreshMap() {
 
 const setTarget = idx => { 
     currentIndex = idx; 
-    window.lastPlayedIndex = -1; // Сбрасываем, чтобы точка могла проиграться при приближении
+    window.lastPlayedIndex = -1;
     refreshMap(); 
     interact(); 
 };
