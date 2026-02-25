@@ -64,12 +64,16 @@
         .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
         .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
+        
+        /* Скрытое видео для предотвращения спящего режима */
+        #nosleep-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body onclick="interact()">
 <div id="loading" class="loading-overlay">Инициализация...</div>
+
+<video id="nosleep-video" playsinline loop muted></video>
 <div id="map"></div>
-<video id="noSleepVideo" playsinline loop muted style="display:none"></video>
 
 <div class="top-controls">
     <div class="icon-btn" onclick="toggleSettings(); event.stopPropagation();">
@@ -128,81 +132,40 @@ const tg = window.Telegram?.WebApp;
 if(tg) { tg.ready(); tg.expand(); if(tg.isVersionAtLeast('8.0')) tg.requestFullscreen?.(); }
 
 const CFG = { USER_ID: "yvayvapyvapyva", TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 3, DEFAULT_CENTER: [56.3268, 44.0059], COLORS: { Gold:'#FFD700', Blue:'#007AFF', Red:'#FF3B30', Lime:'#34C759', Fuchsia:'#AF52DE', Orange:'#FF9500', Purple:'#5856D6', Cyan:'#5AC8FA', Brown:'#A2845E', Grey:'#8E8E93' } };
-let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, wakeLock=null, audioInit=false;
+let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, audioInit=false;
 
 const ui = id => document.getElementById(id);
 
-/**
- * Функция активации блокировки сна экрана (Screen Wake Lock API)
- */
-async function requestWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock was released');
-            });
-        }
-    } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
-    }
-}
-
-// Восстановление блокировки при возврате на страницу
-document.addEventListener('visibilitychange', async () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') {
-        await requestWakeLock();
-    }
-});
-
 async function interact() {
+    // Инициализация аудио (Telegram/iOS)
     if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
-    const v = ui('noSleepVideo');
-    if (v.paused) { v.src='data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAId2lkdGgAAAAIaGVpZ2h0AAAACmRhdGEAAAAAAA=='; v.play().catch(()=>{}); }
     
-    // Запрашиваем блокировку экрана при взаимодействии
-    await requestWakeLock();
+    // Метод: Видео-заглушка для предотвращения сна (NoSleep)
+    const video = ui('nosleep-video');
+    if (video.paused) {
+        // Минимально возможное видео в base64
+        video.src = 'data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAId2lkdGgAAAAIaGVpZ2h0AAAACmRhdGEAAAAAAA==';
+        video.play().then(() => console.log("NoSleep Video active")).catch(e => console.error(e));
+    }
 }
 
-/**
- * Получение пути к аудиофайлу на основе текста команды.
- */
 function getAudioPath(text) {
     if (!text) return null;
-    const cleanName = text.toLowerCase()
-                       .normalize('NFC')
-                       .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "")
-                       .trim()
-                       .replace(/\s+/g, '_');
+    const cleanName = text.toLowerCase().normalize('NFC').replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "").trim().replace(/\s+/g, '_');
     return `audio/${encodeURIComponent(cleanName)}.mp3`;
 }
 
-/**
- * Предзагрузка аудиофайлов маршрута.
- */
 function preloadAudio(points) {
     const urls = new Set();
-    points.forEach(p => {
-        const path = getAudioPath(p.cmd);
-        if (path) urls.add(path);
-    });
-    urls.forEach(url => {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audio.src = url;
-    });
+    points.forEach(p => { const path = getAudioPath(p.cmd); if (path) urls.add(path); });
+    urls.forEach(url => { const audio = new Audio(); audio.preload = 'auto'; audio.src = url; });
 }
 
-/**
- * Воспроизведение команды.
- */
 function playCommand(text) {
     const path = getAudioPath(text);
     if (!path) return;
     const audio = new Audio(path);
-    audio.play().catch(err => {
-        console.error(`Ошибка воспроизведения: ${path}`, err);
-    });
+    audio.play().catch(err => console.error(`Ошибка воспроизведения: ${path}`, err));
 }
 
 const calcAz = (p1, p2) => {
@@ -288,11 +251,7 @@ async function fetchGists() {
 
 async function loadData(url) {
     ui('loading').innerText = "Загрузка..."; ui('loading').classList.remove('hidden');
-    iconCache.clear();
-    objectManager.removeAll();
-    pathsCollection.removeAll();
-    previewPathsCollection.removeAll();
-    
+    iconCache.clear(); objectManager.removeAll(); pathsCollection.removeAll(); previewPathsCollection.removeAll();
     try {
         const res = await fetch(url);
         pointsData = (await res.json()).map(d => ({ 
@@ -301,10 +260,7 @@ async function loadData(url) {
             cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), 
             az: d.az||0 
         }));
-        
-        // Предзагрузка всех аудиофайлов после получения данных
         preloadAudio(pointsData);
-        
         currentIndex = 0; refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
         ui('navHud').classList.add('active');
