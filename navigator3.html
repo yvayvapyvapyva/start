@@ -132,11 +132,36 @@ let map, objectManager, userMarker, pathsCollection, previewPathsCollection, poi
 
 const ui = id => document.getElementById(id);
 
+/**
+ * Функция активации блокировки сна экрана (Screen Wake Lock API)
+ */
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                console.log('Wake Lock was released');
+            });
+        }
+    } catch (err) {
+        console.error(`${err.name}, ${err.message}`);
+    }
+}
+
+// Восстановление блокировки при возврате на страницу
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+    }
+});
+
 async function interact() {
     if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
     const v = ui('noSleepVideo');
     if (v.paused) { v.src='data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAId2lkdGgAAAAIaGVpZ2h0AAAACmRhdGEAAAAAAA=='; v.play().catch(()=>{}); }
-    if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen').catch(()=>null);
+    
+    // Запрашиваем блокировку экрана при взаимодействии
+    await requestWakeLock();
 }
 
 /**
