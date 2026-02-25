@@ -12,17 +12,14 @@
         #map { position: absolute; inset: 0; z-index: 1; touch-action: auto; }
         [class*="-copyrights-pane"], [class*="-map-copyrights-promo"], [class*="-controls-pane"] { display: none !important; }
         
-        /* Top Controls */
         .top-controls { position: absolute; top: 16px; right: 16px; z-index: 9005; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .icon-btn { pointer-events: auto; width: 48px; height: 48px; border-radius: 14px; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
         .icon-btn svg { fill: white; width: 24px; }
 
-        /* Settings Panel */
         #settingsOverlay { position: absolute; top: 74px; right: 16px; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #333; }
-        .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; font-family: inherit; background: white; }
+        .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; background: white; }
 
-        /* Bottom UI */
         .bottom-ui-wrapper { position: absolute; bottom: 30px; left: 16px; right: 16px; z-index: 9000; display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; pointer-events: none; }
         #navHud, #selectionHud { flex: 1; background: rgba(0,0,0,0.85); backdrop-filter: var(--panel-blur); border-radius: 18px; padding: 14px; color: white; display: none; flex-direction: column; gap: 6px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.4); pointer-events: auto; max-width: calc(100% - 80px); }
         #navHud.active, #selectionHud.active { display: flex; }
@@ -30,7 +27,6 @@
         .hud-actions { display: flex; gap: 8px; margin-top: 8px; }
         .hud-btn { flex: 1; padding: 10px; border-radius: 10px; border: none; background: var(--btn); color: white; font-weight: 700; font-size: 13px; cursor: pointer; }
         
-        /* Menu & List */
         #filterMenu { position: absolute; bottom: 60px; right: 0; pointer-events: auto; background: var(--sheet-bg); border-radius: 20px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); min-width: 280px; max-width: calc(100vw - 40px); max-height: 70vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .menu-header { padding: 12px; background: #f9f9f9; border-bottom: 1px solid rgba(0,0,0,0.08); }
         #pointsList { overflow-y: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -65,13 +61,13 @@
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
         .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
         
-        /* Скрытое видео для предотвращения спящего режима */
+        /* Невидимый элемент видео для NoSleep */
         #nosleep-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body onclick="interact()">
-<div id="loading" class="loading-overlay">Инициализация...</div>
 
+<div id="loading" class="loading-overlay">Инициализация...</div>
 <video id="nosleep-video" playsinline loop muted></video>
 <div id="map"></div>
 
@@ -129,25 +125,53 @@
 
 <script>
 const tg = window.Telegram?.WebApp;
-if(tg) { tg.ready(); tg.expand(); if(tg.isVersionAtLeast('8.0')) tg.requestFullscreen?.(); }
+let wakeLock = null;
+
+// Инициализация Telegram и Fullscreen
+if(tg) { 
+    tg.ready(); 
+    tg.expand(); 
+    if(tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen(); 
+}
 
 const CFG = { USER_ID: "yvayvapyvapyva", TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 3, DEFAULT_CENTER: [56.3268, 44.0059], COLORS: { Gold:'#FFD700', Blue:'#007AFF', Red:'#FF3B30', Lime:'#34C759', Fuchsia:'#AF52DE', Orange:'#FF9500', Purple:'#5856D6', Cyan:'#5AC8FA', Brown:'#A2845E', Grey:'#8E8E93' } };
 let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, audioInit=false;
 
 const ui = id => document.getElementById(id);
 
+// ИНТЕГРАЦИЯ ТРЕХ МЕТОДОВ
 async function interact() {
-    // Инициализация аудио (Telegram/iOS)
+    // 1. Звуковой метод (для активации контекста на iOS/Android)
     if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
     
-    // Метод: Видео-заглушка для предотвращения сна (NoSleep)
+    // 2. Метод NoSleep Video (зацикленное невидимое видео)
     const video = ui('nosleep-video');
     if (video.paused) {
-        // Минимально возможное видео в base64
         video.src = 'data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAId2lkdGgAAAAIaGVpZ2h0AAAACmRhdGEAAAAAAA==';
-        video.play().then(() => console.log("NoSleep Video active")).catch(e => console.error(e));
+        video.play().catch(e => console.warn("Video NoSleep failed", e));
     }
+
+    // 3. Screen Wake Lock API (Официальный метод браузера)
+    if ('wakeLock' in navigator && !wakeLock) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => { wakeLock = null; });
+            console.log("WakeLock acquired");
+        } catch (err) {
+            console.warn("WakeLock request failed", err);
+        }
+    }
+
+    // Дополнительно: подтверждение полноэкранного режима Telegram
+    if(tg && tg.requestFullscreen) tg.requestFullscreen();
 }
+
+// Восстановление WakeLock при возврате во вкладку
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') {
+        wakeLock = await navigator.wakeLock.request('screen').catch(()=>null);
+    }
+});
 
 function getAudioPath(text) {
     if (!text) return null;
@@ -156,16 +180,17 @@ function getAudioPath(text) {
 }
 
 function preloadAudio(points) {
-    const urls = new Set();
-    points.forEach(p => { const path = getAudioPath(p.cmd); if (path) urls.add(path); });
-    urls.forEach(url => { const audio = new Audio(); audio.preload = 'auto'; audio.src = url; });
+    points.forEach(p => { 
+        const path = getAudioPath(p.cmd); 
+        if (path) { const audio = new Audio(); audio.preload = 'auto'; audio.src = path; }
+    });
 }
 
 function playCommand(text) {
     const path = getAudioPath(text);
     if (!path) return;
     const audio = new Audio(path);
-    audio.play().catch(err => console.error(`Ошибка воспроизведения: ${path}`, err));
+    audio.play().catch(err => console.error(`Audio fail: ${path}`, err));
 }
 
 const calcAz = (p1, p2) => {
@@ -251,7 +276,6 @@ async function fetchGists() {
 
 async function loadData(url) {
     ui('loading').innerText = "Загрузка..."; ui('loading').classList.remove('hidden');
-    iconCache.clear(); objectManager.removeAll(); pathsCollection.removeAll(); previewPathsCollection.removeAll();
     try {
         const res = await fetch(url);
         pointsData = (await res.json()).map(d => ({ 
