@@ -16,7 +16,6 @@
             padding: 0;
             height: 100%;
             width: 100%;
-            /* Фиксация экрана от случайных свайпов */
             overflow: hidden;
             position: fixed;
             touch-action: none;
@@ -51,67 +50,74 @@
                 color: #000000;
             }
         }
+
+        /* Скрытое видео для предотвращения сна */
+        #wake-lock-video {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0.01;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="flex flex-col">
 
+    <!-- Невидимый видео-элемент -->
+    <video id="wake-lock-video" playsinline muted loop>
+        <source src="https://raw.githubusercontent.com/anars/blank-video/master/200ms-black.mp4" type="video/mp4">
+    </video>
+
     <div class="scroll-container w-full">
         <div class="w-full max-w-md space-y-4 py-8">
-            
             <a href="navigator3.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 НАВИГАТОР
             </a>
-
             <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 НАВИГАТОР 4
             </a>
-
             <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 ПРОСМОТР МАРШРУТОВ
             </a>
-
             <a href="create_route.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 СОЗДАНИЕ МАРШРУТА
             </a>
-
             <a href="fullbase.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 РЕДАКТОР ОБЩЕЙ БАЗЫ ДАННЫХ
             </a>
-
             <a href="редактор_новый2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 СОЗДАНИЕ МАРШРУТА НОВЫЙ
             </a>
-
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        let wakeLock = null;
+        const video = document.getElementById('wake-lock-video');
 
-        // Функция для предотвращения спящего режима
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake Lock активирован: экран не погаснет');
-                }
-            } catch (err) {
-                console.error(`Ошибка Wake Lock: ${err.name}, ${err.message}`);
-            }
+        // Метод предотвращения сна через видео
+        function keepScreenAlive() {
+            video.play().catch(err => {
+                console.log("Автозапуск видео заблокирован, ожидание взаимодействия");
+            });
         }
 
         function initApp() {
             tg.ready();
             tg.expand();
 
-            // Запрашиваем анти-сон
-            requestWakeLock();
+            // Запускаем видео при инициализации
+            keepScreenAlive();
 
-            // Перезапрашиваем анти-сон, если приложение было свернуто и развернуто
-            document.addEventListener('visibilitychange', async () => {
-                if (wakeLock !== null && document.visibilityState === 'visible') {
-                    await requestWakeLock();
+            // Если браузер требует клика для запуска видео, активируем при первом касании
+            document.body.addEventListener('touchstart', () => {
+                video.play();
+            }, { once: true });
+
+            // Возобновляем при возврате в приложение
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    video.play();
                 }
             });
 
@@ -128,7 +134,6 @@
                 tg.setBackgroundColor('#000000');
             }
 
-            // Отключаем вертикальные свайпы для стабильности полноэкранного режима
             if (tg.isVersionAtLeast('7.7')) {
                 tg.disableVerticalSwipes();
             }
