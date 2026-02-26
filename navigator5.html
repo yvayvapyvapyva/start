@@ -12,13 +12,12 @@
         #map { position: absolute; inset: 0; z-index: 1; touch-action: auto; }
         [class*="-copyrights-pane"], [class*="-map-copyrights-promo"], [class*="-controls-pane"] { display: none !important; }
         
-        /* Кнопка настроек опущена на 100px (было 16px, стало 116px) */
-        .top-controls { position: absolute; top: 116px; right: 16px; z-index: 9005; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .icon-btn { pointer-events: auto; width: 48px; height: 48px; border-radius: 14px; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
+        /* Кнопка настроек теперь внутри control-stack, стили icon-btn адаптированы */
+        .icon-btn { pointer-events: auto; width: 52px; height: 52px; border-radius: 50%; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
         .icon-btn svg { fill: white; width: 24px; }
 
-        /* Окно настроек также опущено (было 74px, стало 174px) */
-        #settingsOverlay { position: absolute; top: 174px; right: 16px; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
+        /* Окно настроек теперь привязано к нижнему блоку управления */
+        #settingsOverlay { position: absolute; bottom: 185px; right: 0; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #333; }
         .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; background: white; }
 
@@ -71,17 +70,6 @@
 <video id="noSleepVideo" playsinline webkit-playsinline loop muted></video>
 <div id="map"></div>
 
-<div class="top-controls">
-    <div class="icon-btn" onclick="toggleSettings(); event.stopPropagation();">
-        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-    </div>
-    <div id="settingsOverlay" onclick="event.stopPropagation()">
-        <div class="settings-row"><span>Триггер (м)</span><input type="number" class="trigger-input" value="25" onchange="CFG.TRIGGER_DIST=+this.value"></div>
-        <div class="settings-row"><span>Мин. скорость</span><input type="number" class="trigger-input" value="3" onchange="CFG.SPEED_THRESHOLD=+this.value"></div>
-        <div class="settings-row"><span>Азимут допуск</span><input type="number" class="trigger-input" value="45" onchange="CFG.AZ_TOLERANCE=+this.value"></div>
-    </div>
-</div>
-
 <div class="bottom-ui-wrapper">
     <div id="navHud">
         <div class="hud-header">
@@ -110,8 +98,21 @@
             <div style="height:1px; width:60%; background:rgba(255,255,255,0.15); margin:2px 0;"></div>
             <div class="tel-item"><span class="tel-label">АЗ</span><span class="tel-value" id="telAz">0°</span></div>
         </div>
+        
         <div style="position: relative;">
+            <!-- Кнопка настроек перенесена сюда, над кнопкой списка -->
+            <div class="icon-btn" onclick="toggleSettings(); event.stopPropagation();" style="margin-bottom: 10px;">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </div>
+            
+            <div id="settingsOverlay" onclick="event.stopPropagation()">
+                <div class="settings-row"><span>Триггер (м)</span><input type="number" class="trigger-input" value="25" onchange="CFG.TRIGGER_DIST=+this.value"></div>
+                <div class="settings-row"><span>Мин. скорость</span><input type="number" class="trigger-input" value="3" onchange="CFG.SPEED_THRESHOLD=+this.value"></div>
+                <div class="settings-row"><span>Азимут допуск</span><input type="number" class="trigger-input" value="45" onchange="CFG.AZ_TOLERANCE=+this.value"></div>
+            </div>
+
             <div class="map-btn" onclick="toggleMenu(); event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></div>
+            
             <div id="filterMenu">
                 <div class="menu-header" onclick="event.stopPropagation()">
                     <select id="sourceSelect" class="source-select" onchange="loadData(this.value); toggleMenu(false);"><option value="" disabled selected>Маршрут...</option></select>
@@ -119,6 +120,7 @@
                 <div id="pointsList"></div>
             </div>
         </div>
+        
         <div id="locateBtn" class="map-btn active" onclick="autoCenter=!autoCenter; this.classList.toggle('active', autoCenter); interact();"><svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 7.48 7.94 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
     </div>
 </div>
