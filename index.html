@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Меню</title>
-    <!-- Подключение Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -44,15 +43,8 @@
             transform: scale(0.98);
         }
 
-        @media (hover: hover) {
-            .nav-link:hover {
-                background-color: #ffffff;
-                color: #000000;
-            }
-        }
-
-        /* Скрытое видео для предотвращения сна */
-        #wake-lock-video {
+        /* Невидимый холст для обмана системы */
+        #keep-awake-canvas {
             position: absolute;
             width: 1px;
             height: 1px;
@@ -63,10 +55,8 @@
 </head>
 <body class="flex flex-col">
 
-    <!-- Невидимый видео-элемент -->
-    <video id="wake-lock-video" playsinline muted loop>
-        <source src="https://raw.githubusercontent.com/anars/blank-video/master/200ms-black.mp4" type="video/mp4">
-    </video>
+    <!-- Холст для имитации активности -->
+    <canvas id="keep-awake-canvas"></canvas>
 
     <div class="scroll-container w-full">
         <div class="w-full max-w-md space-y-4 py-8">
@@ -93,40 +83,51 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const video = document.getElementById('wake-lock-video');
+        let wakeLock = null;
 
-        // Метод предотвращения сна через видео
-        function keepScreenAlive() {
-            video.play().catch(err => {
-                console.log("Автозапуск видео заблокирован, ожидание взаимодействия");
-            });
+        /**
+         * Ультимативный метод удержания экрана включенным
+         */
+        async function stayAwake() {
+            // 1. Пытаемся использовать стандартный Wake Lock API
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log("WakeLock API failed, using fallback...");
+                }
+            }
+
+            // 2. Метод невидимой отрисовки (Canvas Hack)
+            const canvas = document.getElementById('keep-awake-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Запускаем бесконечный цикл отрисовки
+            function preventSleep() {
+                // Рисуем случайный пиксель раз в 100мс
+                ctx.fillRect(0, 0, 1, 1);
+                requestAnimationFrame(preventSleep);
+            }
+            preventSleep();
         }
 
         function initApp() {
             tg.ready();
             tg.expand();
 
-            // Запускаем видео при инициализации
-            keepScreenAlive();
+            // Активируем удержание экрана
+            stayAwake();
 
-            // Если браузер требует клика для запуска видео, активируем при первом касании
-            document.body.addEventListener('touchstart', () => {
-                video.play();
-            }, { once: true });
-
-            // Возобновляем при возврате в приложение
-            document.addEventListener('visibilitychange', () => {
+            // Перезапуск при возвращении из фона
+            document.addEventListener('visibilitychange', async () => {
                 if (document.visibilityState === 'visible') {
-                    video.play();
+                    stayAwake();
                 }
             });
 
+            // Настройка UI
             if (tg.isVersionAtLeast('7.0')) {
-                try {
-                    tg.requestFullscreen();
-                } catch (e) {
-                    console.error("Fullscreen error:", e);
-                }
+                try { tg.requestFullscreen(); } catch (e) {}
             }
 
             if (tg.isVersionAtLeast('6.1')) {
