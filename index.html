@@ -66,10 +66,6 @@
                 НАВИГАТОР 4
             </a>
 
-            <a href="navigator5.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                НАВИГАТОР 5 без полного экрана
-            </a>
-
             <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
                 ПРОСМОТР МАРШРУТОВ
             </a>
@@ -91,10 +87,33 @@
 
     <script>
         const tg = window.Telegram.WebApp;
+        let wakeLock = null;
+
+        // Функция для предотвращения спящего режима
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock активирован: экран не погаснет');
+                }
+            } catch (err) {
+                console.error(`Ошибка Wake Lock: ${err.name}, ${err.message}`);
+            }
+        }
 
         function initApp() {
             tg.ready();
             tg.expand();
+
+            // Запрашиваем анти-сон
+            requestWakeLock();
+
+            // Перезапрашиваем анти-сон, если приложение было свернуто и развернуто
+            document.addEventListener('visibilitychange', async () => {
+                if (wakeLock !== null && document.visibilityState === 'visible') {
+                    await requestWakeLock();
+                }
+            });
 
             if (tg.isVersionAtLeast('7.0')) {
                 try {
@@ -108,9 +127,11 @@
                 tg.setHeaderColor('#000000');
                 tg.setBackgroundColor('#000000');
             }
-            
-            // УДАЛЕНО: tg.enableClosingConfirmation(); 
-            // Теперь приложение будет закрываться сразу без предупреждения.
+
+            // Отключаем вертикальные свайпы для стабильности полноэкранного режима
+            if (tg.isVersionAtLeast('7.7')) {
+                tg.disableVerticalSwipes();
+            }
         }
 
         initApp();
