@@ -12,11 +12,13 @@
         #map { position: absolute; inset: 0; z-index: 1; touch-action: auto; }
         [class*="-copyrights-pane"], [class*="-map-copyrights-promo"], [class*="-controls-pane"] { display: none !important; }
         
-        .top-controls { position: absolute; top: 16px; right: 16px; z-index: 9005; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        /* Кнопка настроек опущена на 100px (было 16px, стало 116px) */
+        .top-controls { position: absolute; top: 116px; right: 16px; z-index: 9005; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .icon-btn { pointer-events: auto; width: 48px; height: 48px; border-radius: 14px; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
         .icon-btn svg { fill: white; width: 24px; }
 
-        #settingsOverlay { position: absolute; top: 74px; right: 16px; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
+        /* Окно настроек также опущено (было 74px, стало 174px) */
+        #settingsOverlay { position: absolute; top: 174px; right: 16px; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #333; }
         .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; background: white; }
 
@@ -123,7 +125,6 @@
 
 <script>
 const tg = window.Telegram?.WebApp;
-// Убрана функция открытия в полноэкранном режиме в телеграм
 if(tg) { tg.ready(); tg.expand(); }
 
 const CFG = { USER_ID: "yvayvapyvapyva", TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 3, DEFAULT_CENTER: [56.3268, 44.0059], COLORS: { Gold:'#FFD700', Blue:'#007AFF', Red:'#FF3B30', Lime:'#34C759', Fuchsia:'#AF52DE', Orange:'#FF9500', Purple:'#5856D6', Cyan:'#5AC8FA', Brown:'#A2845E', Grey:'#8E8E93' } };
