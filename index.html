@@ -2,18 +2,24 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Меню</title>
+    <!-- Подключение Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             background-color: #000000;
             color: #ffffff;
             font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            /* Убираем лишние отступы для мобильных устройств */
+            margin: 0;
+            overflow-x: hidden;
         }
         .nav-link {
             border: 1px solid #333;
             transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent; /* Убирает синюю вспышку при нажатии на мобильных */
         }
         .nav-link:active {
             background-color: #ffffff;
@@ -37,7 +43,7 @@
             НАВИГАТОР
         </a>
 
-        <!-- Кнопка 1 -->
+        <!-- Кнопка 1.1 -->
         <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
             НАВИГАТОР 4
         </a>
@@ -64,5 +70,23 @@
 
     </div>
 
+    <script>
+        // Инициализация Telegram Web App
+        const tg = window.Telegram.WebApp;
+
+        // Сообщаем Telegram, что приложение готово
+        tg.ready();
+
+        // Разворачиваем приложение на максимально возможную высоту
+        tg.expand();
+
+        // Настройка темы (опционально: подстраиваем под цвета Telegram)
+        tg.setHeaderColor('#000000');
+        tg.setBackgroundColor('#000000');
+
+        // Пример обработки кнопок (можно добавить подтверждение перед переходом)
+        // tg.MainButton.setText('ЗАКРЫТЬ МЕНЮ').show();
+        // tg.MainButton.onClick(() => tg.close());
+    </script>
 </body>
 </html>
