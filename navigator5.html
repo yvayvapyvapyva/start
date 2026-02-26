@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>Route Navigator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <!-- Telegram SDK удален -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=ru_RU&suppressMapOpenBlock=true"></script>
     <style>
         :root { 
@@ -71,7 +70,7 @@
         #v { position: fixed; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
     </style>
 </head>
-<body onclick="wake()">
+<body>
 
 <div id="loading" class="loading-overlay">Инициализация...</div>
 <video id="v" playsinline muted loop></video>
@@ -132,27 +131,43 @@
 </div>
 
 <script>
-// Все ссылки на Telegram WebApp удалены
 const v = document.getElementById('v');
 let wl = null;
 
+// Обновленный механизм активации антисна
 const wake = async () => {
-    // Механизм WakeLock для обычного браузера
-    if ('wakeLock' in navigator && !wl) {
+    // 1. Сбрасываем старый лок перед запросом нового
+    if (wl) {
+        try { await wl.release(); } catch(e) {}
+        wl = null;
+    }
+
+    // 2. Запрос системного Wake Lock (Android/Desktop Chrome)
+    if ('wakeLock' in navigator) {
         try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
     }
+
+    // 3. Запуск видео-хака (iOS Safari)
     if (!v.src) {
         v.src = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
     }
     v.play().catch(() => {});
     
+    // Инициализация аудио контекста по первому клику
     if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
 };
 
-// Регистрация событий активации антисна
-['touchstart', 'click', 'visibilitychange'].forEach(e => 
-    document.addEventListener(e, () => (document.visibilityState === 'visible' || e !== 'visibilitychange') && wake())
+// Слушаем события для реактивации после блокировки экрана или сворачивания
+['touchstart', 'click', 'visibilitychange', 'focus'].forEach(e => 
+    document.addEventListener(e, () => {
+        if (document.visibilityState === 'visible' || e !== 'visibilitychange') {
+            wake();
+        }
+    })
 );
+
+// Начальный запуск
+wake();
 
 const CFG = { 
     USER_ID: "yvayvapyvapyva", 

@@ -16,8 +16,20 @@
         const v = document.getElementById('v');
         let wl = null;
 
+        // Функция активации антисна
         const wake = async () => {
-            if ('wakeLock' in navigator && !wl) try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
+            // Сбрасываем старый лок перед запросом нового
+            if (wl) {
+                try { await wl.release(); } catch(e) {}
+                wl = null;
+            }
+
+            // Запрос системного Wake Lock (Android)
+            if ('wakeLock' in navigator) {
+                try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
+            }
+
+            // Запуск видео-хака (iOS)
             if (!v.src) v.src = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
             v.play().catch(() => {});
         };
@@ -26,10 +38,18 @@
         tg.expand();
         if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
 
-        ['touchstart', 'click', 'visibilitychange'].forEach(e => 
-            document.addEventListener(e, () => (document.visibilityState === 'visible' || e !== 'visibilitychange') && wake())
+        // Слушаем события для реактивации после включения экрана
+        // visibilitychange - когда вкладка становится видимой
+        // focus - когда окно получает фокус
+        ['touchstart', 'click', 'visibilitychange', 'focus'].forEach(e => 
+            document.addEventListener(e, () => {
+                if (document.visibilityState === 'visible' || e !== 'visibilitychange') {
+                    wake();
+                }
+            })
         );
         
+        // Начальный запуск
         wake();
     </script>
 </body>
