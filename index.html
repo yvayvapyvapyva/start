@@ -8,143 +8,67 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body, html {
-            background-color: #000000;
-            color: #ffffff;
-            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            position: fixed;
-            touch-action: none;
+            background: #000; color: #fff;
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; position: fixed; touch-action: none;
         }
-
         .scroll-container {
-            height: 100%;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            touch-action: pan-y;
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            touch-action: pan-y; padding: 1.5rem; display: flex; align-items: center; justify-content: center;
         }
-
         .nav-link {
-            border: 1px solid #333;
-            transition: all 0.2s ease;
+            border: 1px solid #333; transition: all 0.2s ease;
             -webkit-tap-highlight-color: transparent;
         }
-
-        .nav-link:active {
-            background-color: #ffffff;
-            color: #000000;
-            transform: scale(0.98);
-        }
-
-        /* Невидимое видео для iOS */
-        #ios-wake-lock-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-            pointer-events: none;
-        }
+        .nav-link:active { background: #fff; color: #000; transform: scale(0.98); }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <!-- Минимальное пустое видео в Base64 для обхода защиты iOS -->
-    <video id="ios-wake-lock-video" playsinline muted loop></video>
+    <video id="v" playsinline muted loop style="position:fixed;width:1px;height:1px;opacity:0"></video>
 
     <div class="scroll-container w-full">
         <div class="w-full max-w-md space-y-4 py-8">
-            <a href="navigator3.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                НАВИГАТОР
-            </a>
-            <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                НАВИГАТОР 4
-            </a>
-            <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                ПРОСМОТР МАРШРУТОВ
-            </a>
-            <a href="create_route.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                СОЗДАНИЕ МАРШРУТА
-            </a>
-            <a href="fullbase.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                РЕДАКТОР ОБЩЕЙ БАЗЫ ДАННЫХ
-            </a>
-            <a href="редактор_новый2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
-                СОЗДАНИЕ МАРШРУТА НОВЫЙ
-            </a>
+            <a href="navigator3.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">НАВИГАТОР</a>
+            <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">НАВИГАТОР 4</a>
+            <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">ПРОСМОТР МАРШРУТОВ</a>
+            <a href="create_route.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">СОЗДАНИЕ МАРШРУТА</a>
+            <a href="fullbase.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">РЕДАКТОР ОБЩЕЙ БАЗЫ ДАННЫХ</a>
+            <a href="редактор_новый2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">СОЗДАНИЕ МАРШРУТА НОВЫЙ</a>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        const video = document.getElementById('ios-wake-lock-video');
-        let wakeLock = null;
+        const v = document.getElementById('v');
+        let wl = null;
 
-        // Пустое видео (1 пиксель, тишина) в формате Base64, чтобы iOS считало его медиа-потоком
-        const b64Video = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
-
-        async function enableWakeLock() {
-            // 1. Android Wake Lock API
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                } catch (err) {}
+        // Компактная функция антисна
+        const wake = async () => {
+            // Android WakeLock
+            if ('wakeLock' in navigator && !wl) {
+                try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
             }
+            // iOS Video Hack (Base64 1px black video)
+            if (!v.src) v.src = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
+            v.play().catch(() => {});
+        };
 
-            // 2. iOS Video Hack
-            video.src = b64Video;
-            video.play().catch(() => {
-                // Если автозапуск запрещен, видео включится при первом тапе (ниже)
-            });
-        }
+        // Инициализация
+        tg.ready();
+        tg.expand();
+        wake();
 
-        function initApp() {
-            tg.ready();
-            tg.expand();
+        // Активация по касанию (обязательно для iOS) и возврат из фона
+        ['touchstart', 'click', 'visibilitychange'].forEach(ev => {
+            document.addEventListener(ev, () => (document.visibilityState === 'visible' || ev !== 'visibilitychange') && wake());
+        });
 
-            // Попытка запустить анти-сон сразу
-            enableWakeLock();
-
-            // КРИТИЧНО ДЛЯ IOS: Видео на iPhone запускается ТОЛЬКО после первого касания пользователя
-            document.body.addEventListener('touchstart', () => {
-                if (video.paused) {
-                    video.play();
-                }
-                // Также повторно запрашиваем системный лок
-                if (!wakeLock && 'wakeLock' in navigator) {
-                    navigator.wakeLock.request('screen').then(lock => wakeLock = lock);
-                }
-            }, { once: false });
-
-            // Возобновляем при возврате в приложение
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                    enableWakeLock();
-                }
-            });
-
-            // Настройки интерфейса Telegram
-            if (tg.isVersionAtLeast('7.0')) {
-                try { tg.requestFullscreen(); } catch (e) {}
-            }
-            if (tg.isVersionAtLeast('6.1')) {
-                tg.setHeaderColor('#000000');
-                tg.setBackgroundColor('#000000');
-            }
-            if (tg.isVersionAtLeast('7.7')) {
-                tg.disableVerticalSwipes();
-            }
-        }
-
-        initApp();
+        // Настройки Telegram UI
+        if (tg.isVersionAtLeast('7.0')) try { tg.requestFullscreen(); } catch(e) {}
+        if (tg.isVersionAtLeast('6.1')) { tg.setHeaderColor('#000000'); tg.setBackgroundColor('#000000'); }
+        if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
     </script>
 </body>
 </html>
