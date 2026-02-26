@@ -16,7 +16,7 @@
             padding: 0;
             height: 100%;
             width: 100%;
-            /* Фиксация экрана от случайных свайпов (как в вашем примере) */
+            /* Фиксация экрана от случайных свайпов */
             overflow: hidden;
             position: fixed;
             touch-action: none;
@@ -89,32 +89,26 @@
         const tg = window.Telegram.WebApp;
 
         function initApp() {
-            // Сообщаем о готовности
             tg.ready();
-            
-            // 1. Обычное расширение на доступную область
             tg.expand();
 
-            // 2. Попытка входа в настоящий Fullscreen (требует SDK 7.0+)
             if (tg.isVersionAtLeast('7.0')) {
                 try {
                     tg.requestFullscreen();
                 } catch (e) {
-                    console.error("Ошибка при запросе Fullscreen:", e);
+                    console.error("Fullscreen error:", e);
                 }
             }
 
-            // Настройка визуальной части
             if (tg.isVersionAtLeast('6.1')) {
                 tg.setHeaderColor('#000000');
                 tg.setBackgroundColor('#000000');
             }
             
-            // Включаем подтверждение закрытия, чтобы не выйти случайно свайпом
-            tg.enableClosingConfirmation();
+            // УДАЛЕНО: tg.enableClosingConfirmation(); 
+            // Теперь приложение будет закрываться сразу без предупреждения.
         }
 
-        // Запуск инициализации
         initApp();
     </script>
 </body>
