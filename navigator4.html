@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -150,10 +149,6 @@ const calcAz = (p1, p2) => {
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 };
 
-/**
- * Генерация SVG-иконки.
- * Исправлено: Стили текста в точности как в оригинале.
- */
 const getIcon = (col, txt, az, isEnd, isCurr=false) => {
     const key = `${col}-${txt}-${Math.round(az)}-${isEnd}-${isCurr}`;
     if(iconCache.has(key)) return iconCache.get(key);
@@ -164,24 +159,22 @@ const getIcon = (col, txt, az, isEnd, isCurr=false) => {
 };
 
 /**
- * Выделенная функция для отрисовки меток в концах путей.
- * Исправлено: в качестве текста теперь используется порядковый номер точки (idx+1).
+ * Новая функция для отрисовки меток в концах путей.
  */
 function renderPathEndpoints(point, collection, idx) {
     if (!point || !point.paths) return;
-    const pointLabel = String(idx + 1); // Текст метки - порядковый номер (индекс + 1)
+    const label = String(idx + 1);
     point.paths.forEach(ps => {
         if (!ps.pts || ps.pts.length < 2) return;
-        const l = ps.pts.length;
-        const lastPoint = ps.pts[l - 1];
-        const preLastPoint = ps.pts[l - 2];
-        const endAz = calcAz(preLastPoint, lastPoint);
-        
-        collection.add(new ymaps.Placemark(lastPoint, {}, {
+        const pts = ps.pts;
+        const last = pts[pts.length - 1];
+        const prev = pts[pts.length - 2];
+        const endAz = calcAz(prev, last);
+        collection.add(new ymaps.Placemark(last, {}, {
             iconLayout: 'default#imageWithContent',
             iconImageSize: [34, 34],
             iconImageOffset: [-17, -17],
-            iconImageHref: getIcon(point.hex, pointLabel, endAz, true)
+            iconImageHref: getIcon(point.hex, label, endAz, true)
         }));
     });
 }
@@ -277,7 +270,6 @@ function refreshMap() {
     pathsCollection.removeAll();
     const curr = pointsData[currentIndex];
     
-    // В основной метке на карте тоже используется порядковый номер (p.id здесь часто выступает как визуальный номер)
     objectManager.add(pointsData.filter((p, i) => i >= currentIndex).map(p => ({
         type:'Feature', id:p.id, geometry:{type:'Point', coordinates:[p.lat, p.lon]},
         options:{ iconLayout:'default#imageWithContent', iconImageHref:getIcon(p.hex, `${p.id}${p.paths?.some(x=>x.comm)?'!':''}`, p.az, false, p===curr), iconImageSize:[40,40], iconImageOffset:[-20,-20] }
@@ -289,7 +281,6 @@ function refreshMap() {
                 if(!ps.pts || ps.pts.length<2) return;
                 pathsCollection.add(new ymaps.Polyline(ps.pts, {}, {strokeColor:curr.hex, strokeWidth:5, strokeOpacity:0.9}));
             });
-            // Передаем индекс для корректного отображения цифры в конце пути
             renderPathEndpoints(curr, pathsCollection, currentIndex);
         }
     }
