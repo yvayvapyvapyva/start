@@ -57,16 +57,21 @@
         .map-btn.active { background: var(--btn); }
 
         .source-select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); font-size: 13px; background: white; font-weight: 600; }
-        .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
+        .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-        .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
+        #loadingBar { width: 200px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin-top: 20px; overflow: hidden; display: none; }
+        #loadingProgress { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
         
+        .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
         #nosleep-video { position: absolute; top:0; left:0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; z-index: -1; }
     </style>
 </head>
 <body onclick="forceKeepAwake()">
 
-<div id="loading" class="loading-overlay">Инициализация...</div>
+<div id="loading" class="loading-overlay">
+    <div id="loadingText">Инициализация...</div>
+    <div id="loadingBar"><div id="loadingProgress"></div></div>
+</div>
 
 <video id="nosleep-video" playsinline webkit-playsinline loop muted></video>
 <div id="map"></div>
@@ -127,6 +132,7 @@
 const tg = window.Telegram?.WebApp;
 let wakeLock = null;
 let audioInit = false;
+const AUDIO_CACHE_NAME = 'route-navigator-audio-v1';
 
 if(tg) { tg.ready(); tg.expand(); if(tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen(); }
 
@@ -134,6 +140,33 @@ const CFG = { USER_ID: "yvayvapyvapyva", TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPE
 let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0;
 
 const ui = id => document.getElementById(id);
+
+/** ПРЕДЗАГРУЗКА И КЕШИРОВАНИЕ АУДИО **/
+async function cacheAudioFiles(points) {
+    if (!('caches' in window)) return;
+    
+    ui('loadingText').innerText = "Кеширование аудио...";
+    ui('loadingBar').style.display = 'block';
+    
+    const cache = await caches.open(AUDIO_CACHE_NAME);
+    const urls = [...new Set(points.map(p => getAudioPath(p.cmd)).filter(url => !!url))];
+    let loaded = 0;
+
+    for (const url of urls) {
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                await cache.put(url, response);
+            }
+        } catch (e) { console.warn(`Failed to cache: ${url}`); }
+        
+        loaded++;
+        ui('loadingProgress').style.width = `${(loaded / urls.length) * 100}%`;
+    }
+    
+    ui('loadingBar').style.display = 'none';
+    ui('loadingProgress').style.width = '0%';
+}
 
 async function forceKeepAwake() {
     const video = ui('nosleep-video');
@@ -166,11 +199,31 @@ function getAudioPath(text) {
     return `audio/${encodeURIComponent(cleanName)}.mp3`;
 }
 
-function playCommand(text) {
-    const path = getAudioPath(text);
-    if (!path) return;
-    const audio = new Audio(path);
-    audio.play().catch(err => console.error(`Error audio: ${path}`, err));
+/** ВОСПРОИЗВЕДЕНИЕ С ПОДДЕРЖКОЙ КЕША **/
+async function playCommand(text) {
+    const url = getAudioPath(text);
+    if (!url) return;
+
+    try {
+        // Проверяем наличие в кеше сначала (для оффлайна)
+        if ('caches' in window) {
+            const cache = await caches.open(AUDIO_CACHE_NAME);
+            const cachedResponse = await cache.match(url);
+            if (cachedResponse) {
+                const blob = await cachedResponse.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const audio = new Audio(blobUrl);
+                audio.onended = () => URL.revokeObjectURL(blobUrl);
+                audio.play().catch(e => console.error("Audio play error", e));
+                return;
+            }
+        }
+        // Если в кеше нет, пробуем сеть напрямую
+        const audio = new Audio(url);
+        audio.play().catch(err => console.error(`Error audio: ${url}`, err));
+    } catch (e) {
+        console.error("Audio handle error", e);
+    }
 }
 
 const calcAz = (p1, p2) => {
@@ -188,7 +241,6 @@ const getIcon = (col, txt, az, isEnd, isCurr=false) => {
     iconCache.set(key, res); return res;
 };
 
-/** МЕТКА В КОНЦЕ ПУТИ **/
 function addPathEndpoint(point, collection, idx) {
     if (!point || !point.paths) return;
     const label = String(idx + 1);
@@ -268,7 +320,8 @@ async function fetchGists() {
 }
 
 async function loadData(url) {
-    ui('loading').innerText = "Загрузка..."; ui('loading').classList.remove('hidden');
+    ui('loadingText').innerText = "Загрузка маршрута...";
+    ui('loading').classList.remove('hidden');
     iconCache.clear();
     try {
         const res = await fetch(url);
@@ -278,11 +331,19 @@ async function loadData(url) {
             cmd: (d.paths?.[0]?.cmd?.[0] || d.comment || `Т${d.id}`).normalize('NFC'), 
             az: d.az||0 
         }));
+        
+        // Запускаем кеширование аудио после загрузки данных
+        await cacheAudioFiles(pointsData);
+        
         currentIndex = 0; refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
         ui('navHud').classList.add('active');
         forceKeepAwake();
-    } finally { ui('loading').classList.add('hidden'); }
+    } catch(e) {
+        ui('loadingText').innerText = "Ошибка загрузки!";
+    } finally { 
+        ui('loading').classList.add('hidden'); 
+    }
 }
 
 function refreshMap() {
