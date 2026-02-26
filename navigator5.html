@@ -2,21 +2,29 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Route Navigator Optimized</title>
+    <title>Route Navigator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Telegram SDK удален -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=YANDEX_API_KEY&lang=ru_RU&suppressMapOpenBlock=true"></script>
     <style>
-        :root { --bg: var(--tg-theme-bg-color, #f5f5f7); --btn: var(--tg-theme-button-color, #007AFF); --btn-txt: var(--tg-theme-button-text-color, #fff); --sheet-bg: rgba(255, 255, 255, 0.95); --text-main: #1d1d1f; --text-sub: #86868b; --accent: #007AFF; --border: rgba(255,255,255,0.1); --panel-blur: blur(15px); }
+        :root { 
+            --bg: #f5f5f7; 
+            --btn: #007AFF; 
+            --btn-txt: #fff; 
+            --sheet-bg: rgba(255, 255, 255, 0.95); 
+            --text-main: #1d1d1f; 
+            --text-sub: #86868b; 
+            --accent: #007AFF; 
+            --border: rgba(255,255,255,0.1); 
+            --panel-blur: blur(15px); 
+        }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, sans-serif; overflow: hidden; background: #000; position: fixed; touch-action: none; }
         #map { position: absolute; inset: 0; z-index: 1; touch-action: auto; }
         [class*="-copyrights-pane"], [class*="-map-copyrights-promo"], [class*="-controls-pane"] { display: none !important; }
         
-        /* Кнопка настроек теперь внутри control-stack, стили icon-btn адаптированы */
         .icon-btn { pointer-events: auto; width: 52px; height: 52px; border-radius: 50%; background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: var(--panel-blur); }
         .icon-btn svg { fill: white; width: 24px; }
 
-        /* Окно настроек теперь привязано к нижнему блоку управления */
         #settingsOverlay { position: absolute; bottom: 185px; right: 0; z-index: 9010; background: var(--sheet-bg); border-radius: 18px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); width: 240px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 12px; gap: 10px; pointer-events: auto; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #333; }
         .trigger-input { width: 54px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); text-align: center; font-weight: 700; background: white; }
@@ -34,7 +42,6 @@
         
         .point-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid transparent; cursor: pointer; }
         .point-item.active { border-color: var(--accent); background: rgba(0,122,255,0.05); }
-        .point-item.passed { opacity: 0.4; }
         .point-badge { min-width: 22px; height: 22px; border-radius: 50%; background: #f0f0f2; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
         .active .point-badge { background: var(--accent); color: #fff; }
         .point-name { font-size: 14px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -61,20 +68,20 @@
         .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
         .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
-        #noSleepVideo { position: absolute; top:0; left:0; width:1px; height:1px; opacity: 0.01; pointer-events: none; }
+        #v { position: fixed; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
     </style>
 </head>
-<body onclick="interact()">
+<body onclick="wake()">
 
 <div id="loading" class="loading-overlay">Инициализация...</div>
-<video id="noSleepVideo" playsinline webkit-playsinline loop muted></video>
+<video id="v" playsinline muted loop></video>
 <div id="map"></div>
 
 <div class="bottom-ui-wrapper">
     <div id="navHud">
         <div class="hud-header">
             <span class="hud-index" id="hudIndex">1</span>
-            <div class="hud-cmd" id="hudCmd">Загрузите маршрут...</div>
+            <div class="hud-cmd" id="hudCmd">Выберите маршрут...</div>
         </div>
         <div class="hud-stats">
             <div class="stat-item"><span class="stat-label">ДИСТ:</span> <span class="stat-value" id="hudDist">---</span></div>
@@ -85,7 +92,7 @@
     <div id="selectionHud">
         <div class="hud-header">
             <span class="hud-index" id="selIndex">0</span>
-            <div class="hud-cmd" id="selCmd">Выбранная точка</div>
+            <div class="hud-cmd" id="selCmd">Точка маршрута</div>
         </div>
         <div class="hud-actions">
             <button class="hud-btn" id="selConfirmBtn">Сделать текущей целью</button>
@@ -100,7 +107,6 @@
         </div>
         
         <div style="position: relative;">
-            <!-- Кнопка настроек перенесена сюда, над кнопкой списка -->
             <div class="icon-btn" onclick="toggleSettings(); event.stopPropagation();" style="margin-bottom: 10px;">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </div>
@@ -115,31 +121,51 @@
             
             <div id="filterMenu">
                 <div class="menu-header" onclick="event.stopPropagation()">
-                    <select id="sourceSelect" class="source-select" onchange="loadData(this.value); toggleMenu(false);"><option value="" disabled selected>Маршрут...</option></select>
+                    <select id="sourceSelect" class="source-select" onchange="loadData(this.value); toggleMenu(false);"><option value="" disabled selected>Загрузить маршрут...</option></select>
                 </div>
                 <div id="pointsList"></div>
             </div>
         </div>
         
-        <div id="locateBtn" class="map-btn active" onclick="autoCenter=!autoCenter; this.classList.toggle('active', autoCenter); interact();"><svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 7.48 7.94 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
+        <div id="locateBtn" class="map-btn active" onclick="autoCenter=!autoCenter; this.classList.toggle('active', autoCenter); wake();"><svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 7.48 7.94 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
     </div>
 </div>
 
 <script>
-const tg = window.Telegram?.WebApp;
-if(tg) { tg.ready(); tg.expand(); }
+// Все ссылки на Telegram WebApp удалены
+const v = document.getElementById('v');
+let wl = null;
 
-const CFG = { USER_ID: "yvayvapyvapyva", TRIGGER_DIST: 25, AZ_TOLERANCE: 45, SPEED_THRESHOLD: 3, DEFAULT_CENTER: [56.3268, 44.0059], COLORS: { Gold:'#FFD700', Blue:'#007AFF', Red:'#FF3B30', Lime:'#34C759', Fuchsia:'#AF52DE', Orange:'#FF9500', Purple:'#5856D6', Cyan:'#5AC8FA', Brown:'#A2845E', Grey:'#8E8E93' } };
-let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, wakeLock=null, audioInit=false, audioCache=new Map();
+const wake = async () => {
+    // Механизм WakeLock для обычного браузера
+    if ('wakeLock' in navigator && !wl) {
+        try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
+    }
+    if (!v.src) {
+        v.src = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
+    }
+    v.play().catch(() => {});
+    
+    if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
+};
+
+// Регистрация событий активации антисна
+['touchstart', 'click', 'visibilitychange'].forEach(e => 
+    document.addEventListener(e, () => (document.visibilityState === 'visible' || e !== 'visibilitychange') && wake())
+);
+
+const CFG = { 
+    USER_ID: "yvayvapyvapyva", 
+    TRIGGER_DIST: 25, 
+    AZ_TOLERANCE: 45, 
+    SPEED_THRESHOLD: 3, 
+    DEFAULT_CENTER: [56.3268, 44.0059], 
+    COLORS: { Gold:'#FFD700', Blue:'#007AFF', Red:'#FF3B30', Lime:'#34C759', Fuchsia:'#AF52DE', Orange:'#FF9500', Purple:'#5856D6', Cyan:'#5AC8FA', Brown:'#A2845E', Grey:'#8E8E93' } 
+};
+
+let map, objectManager, userMarker, pathsCollection, previewPathsCollection, pointsData=[], currentIndex=-1, autoCenter=true, iconCache=new Map(), lastPos=null, lastAz=0, audioInit=false, audioCache=new Map();
 
 const ui = id => document.getElementById(id);
-
-async function interact() {
-    if (!audioInit) { (new Audio()).play().catch(()=>{}); audioInit=true; }
-    const v = ui('noSleepVideo');
-    if (v.paused) { v.src='data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAId2lkdGgAAAAIaGVpZ2h0AAAACmRhdGEAAAAAAA=='; v.play().catch(()=>{}); }
-    if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen').catch(()=>null);
-}
 
 function getAudioPath(text) {
     if (!text) return null;
@@ -218,7 +244,7 @@ function initMap(center) {
         });
     });
 
-    map.events.add('click', () => { interact(); closeSelection(); toggleMenu(false); toggleSettings(false); });
+    map.events.add('click', () => { wake(); closeSelection(); toggleMenu(false); toggleSettings(false); });
 
     navigator.geolocation.watchPosition(p => {
         const c = [p.coords.latitude, p.coords.longitude], speed = p.coords.speed ? p.coords.speed*3.6 : 0;
@@ -233,6 +259,7 @@ function initMap(center) {
 
     fetchGists();
     ui('loading').classList.add('hidden');
+    wake();
 }
 
 const closeSelection = () => { ui('selectionHud').classList.remove('active'); if(currentIndex>=0) ui('navHud').classList.add('active'); previewPathsCollection.removeAll(); };
@@ -293,14 +320,14 @@ function refreshMap() {
     renderList(); updateHUD();
 }
 
-const setTarget = idx => { currentIndex=idx; refreshMap(); interact(); };
+const setTarget = idx => { currentIndex=idx; refreshMap(); wake(); };
 
 function checkNav() {
     if(currentIndex<0 || !lastPos) return;
     const t = pointsData[currentIndex], d = ymaps.coordSystem.geo.getDistance(lastPos, [t.lat, t.lon]);
     let ad = Math.abs(lastAz - t.az) % 360; if(ad > 180) ad = 360 - ad;
     updateHUD(d, ad);
-    if(d <= CFG.TRIGGER_DIST && ad <= CFG.AZ_TOLERANCE) { playCommand(t.cmd); currentIndex++; refreshMap(); interact(); }
+    if(d <= CFG.TRIGGER_DIST && ad <= CFG.AZ_TOLERANCE) { playCommand(t.cmd); currentIndex++; refreshMap(); wake(); }
 }
 
 function updateHUD(d, ad) {

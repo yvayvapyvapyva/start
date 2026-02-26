@@ -4,71 +4,116 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Меню</title>
+    <!-- Подключение Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body, html {
-            background: #000; color: #fff;
-            font-family: -apple-system, system-ui, sans-serif;
-            margin: 0; padding: 0; height: 100%; width: 100%;
-            overflow: hidden; position: fixed; touch-action: none;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            /* Фиксация экрана от случайных свайпов */
+            overflow: hidden;
+            position: fixed;
+            touch-action: none;
         }
+
         .scroll-container {
-            height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
-            touch-action: pan-y; padding: 1.5rem; display: flex; align-items: center; justify-content: center;
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+
         .nav-link {
-            border: 1px solid #333; transition: all 0.2s ease;
+            border: 1px solid #333;
+            transition: all 0.2s ease;
             -webkit-tap-highlight-color: transparent;
         }
-        .nav-link:active { background: #fff; color: #000; transform: scale(0.98); }
+
+        .nav-link:active {
+            background-color: #ffffff;
+            color: #000000;
+            transform: scale(0.98);
+        }
+
+        @media (hover: hover) {
+            .nav-link:hover {
+                background-color: #ffffff;
+                color: #000000;
+            }
+        }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <video id="v" playsinline muted loop style="position:fixed;width:1px;height:1px;opacity:0"></video>
-
     <div class="scroll-container w-full">
         <div class="w-full max-w-md space-y-4 py-8">
-            <a href="navigator3.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">НАВИГАТОР</a>
-            <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">НАВИГАТОР 4</a>
-            <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">ПРОСМОТР МАРШРУТОВ</a>
-            <a href="create_route.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">СОЗДАНИЕ МАРШРУТА</a>
-            <a href="fullbase.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">РЕДАКТОР ОБЩЕЙ БАЗЫ ДАННЫХ</a>
-            <a href="редактор_новый2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">СОЗДАНИЕ МАРШРУТА НОВЫЙ</a>
+            
+            <a href="navigator3.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                НАВИГАТОР
+            </a>
+
+            <a href="navigator4.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                НАВИГАТОР 4
+            </a>
+
+            <a href="navigator5.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                НАВИГАТОР 5 без полного экрана
+            </a>
+
+            <a href="view.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                ПРОСМОТР МАРШРУТОВ
+            </a>
+
+            <a href="create_route.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                СОЗДАНИЕ МАРШРУТА
+            </a>
+
+            <a href="fullbase.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                РЕДАКТОР ОБЩЕЙ БАЗЫ ДАННЫХ
+            </a>
+
+            <a href="редактор_новый2.html" class="nav-link block w-full py-5 px-6 rounded-lg text-center text-lg font-medium tracking-wide uppercase">
+                СОЗДАНИЕ МАРШРУТА НОВЫЙ
+            </a>
+
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        const v = document.getElementById('v');
-        let wl = null;
 
-        // Компактная функция антисна
-        const wake = async () => {
-            // Android WakeLock
-            if ('wakeLock' in navigator && !wl) {
-                try { wl = await navigator.wakeLock.request('screen'); } catch(e) {}
+        function initApp() {
+            tg.ready();
+            tg.expand();
+
+            if (tg.isVersionAtLeast('7.0')) {
+                try {
+                    tg.requestFullscreen();
+                } catch (e) {
+                    console.error("Fullscreen error:", e);
+                }
             }
-            // iOS Video Hack (Base64 1px black video)
-            if (!v.src) v.src = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQAAAHvYXZjQwFQAFr/4AAZAWgAVv/AAB9AAAADAAIAAAMAHBDeEAEABWj/gAAAAA5ieHRyY3Rsc3RyYmMAAAALYm9vdnNoZHIAAAADbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAPoAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAGlzb21hdmMxbXA0MgAAAAhmcmVlAAAALm1kYXQ=";
-            v.play().catch(() => {});
-        };
 
-        // Инициализация
-        tg.ready();
-        tg.expand();
-        wake();
+            if (tg.isVersionAtLeast('6.1')) {
+                tg.setHeaderColor('#000000');
+                tg.setBackgroundColor('#000000');
+            }
+            
+            // УДАЛЕНО: tg.enableClosingConfirmation(); 
+            // Теперь приложение будет закрываться сразу без предупреждения.
+        }
 
-        // Активация по касанию (обязательно для iOS) и возврат из фона
-        ['touchstart', 'click', 'visibilitychange'].forEach(ev => {
-            document.addEventListener(ev, () => (document.visibilityState === 'visible' || ev !== 'visibilitychange') && wake());
-        });
-
-        // Настройки Telegram UI
-        if (tg.isVersionAtLeast('7.0')) try { tg.requestFullscreen(); } catch(e) {}
-        if (tg.isVersionAtLeast('6.1')) { tg.setHeaderColor('#000000'); tg.setBackgroundColor('#000000'); }
-        if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
+        initApp();
     </script>
 </body>
 </html>
