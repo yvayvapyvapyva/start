@@ -36,30 +36,29 @@
             align-items: center;
             z-index: 9005; 
             pointer-events: none; 
-            padding: 0 70px; /* Отступы под кнопки Telegram (Close/Menu) */
+            padding: 0 70px; 
         }
         #routeHeaderBtn { 
             pointer-events: auto; 
-            background: rgba(40, 40, 40, 0.4); 
+            background: rgba(40, 40, 40, 0.5); 
             backdrop-filter: var(--panel-blur); 
             -webkit-backdrop-filter: var(--panel-blur);
-            padding: 5px 14px; 
+            padding: 6px 16px; 
             border-radius: 100px; 
-            border: 1px solid rgba(255,255,255,0.15); 
+            border: 1px solid rgba(255,255,255,0.2); 
             color: white; 
             font-size: 13px; 
-            font-weight: 500; 
+            font-weight: 600; 
             max-width: 100%; 
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            transition: opacity 0.3s, transform 0.1s;
-            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
             text-align: center;
+            display: block; /* Всегда видна */
         }
-        #routeHeaderBtn:active { transform: scale(0.96); background: rgba(0,0,0,0.6); }
-        #routeHeaderBtn.visible { display: block; }
+        #routeHeaderBtn:active { transform: scale(0.96); background: rgba(0,0,0,0.7); }
 
         .bottom-ui-wrapper { position: absolute; bottom: 30px; left: 16px; right: 16px; z-index: 9000; display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; pointer-events: none; }
         
@@ -69,15 +68,33 @@
         .hud-actions { display: flex; gap: 8px; margin-top: 8px; }
         .hud-btn { flex: 1; padding: 10px; border-radius: 10px; border: none; background: var(--btn); color: white; font-weight: 700; font-size: 13px; cursor: pointer; }
         
-        #filterMenu { position: absolute; bottom: 60px; right: 0; pointer-events: auto; background: var(--sheet-bg); border-radius: 20px; display: none; flex-direction: column; border: 1px solid rgba(0,0,0,0.15); min-width: 280px; max-width: calc(100vw - 40px); max-height: 70vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .menu-header { padding: 12px; background: #f9f9f9; border-bottom: 1px solid rgba(0,0,0,0.08); }
-        #pointsList { overflow-y: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        /* Список маршрутов и точек */
+        #filterMenu { 
+            position: absolute; 
+            top: calc(var(--twa-header-height) + env(safe-area-inset-top, 0px) + 10px); 
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto; 
+            background: var(--sheet-bg); 
+            border-radius: 20px; 
+            display: none; 
+            flex-direction: column; 
+            border: 1px solid rgba(0,0,0,0.15); 
+            width: 320px; 
+            max-width: calc(100vw - 40px); 
+            max-height: 70vh; 
+            overflow: hidden; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4); 
+            z-index: 9010;
+        }
+        .menu-header { padding: 14px; background: #f2f2f7; border-bottom: 1px solid rgba(0,0,0,0.08); }
+        #pointsList { overflow-y: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: #fff; }
         
-        .point-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid transparent; cursor: pointer; }
+        .point-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #f9f9f9; border: 1px solid transparent; cursor: pointer; }
         .point-item.active { border-color: var(--accent); background: rgba(0,122,255,0.05); }
-        .point-badge { min-width: 22px; height: 22px; border-radius: 50%; background: #f0f0f2; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+        .point-badge { min-width: 22px; height: 22px; border-radius: 50%; background: #e5e5ea; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
         .active .point-badge { background: var(--accent); color: #fff; }
-        .point-name { font-size: 14px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .point-name { font-size: 14px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1c1c1e; }
         
         .hud-header { display: flex; align-items: flex-start; gap: 8px; }
         .hud-index { background: var(--accent); color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 5px; min-width: 14px; text-align: center; }
@@ -103,7 +120,7 @@
         .map-btn svg { fill: white; width: 24px; }
         .map-btn.active { background: var(--btn); }
 
-        .source-select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); font-size: 13px; background: white; font-weight: 600; }
+        .source-select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); font-size: 13px; background: white; font-weight: 600; cursor: pointer; }
         .loading-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
         .loading-overlay.hidden { opacity: 0; pointer-events: none; }
         .speak-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f0f0f2; border: none; }
@@ -117,14 +134,23 @@
 <div id="map"></div>
 
 <div class="top-ui-wrapper">
-    <div id="routeHeaderBtn" onclick="toggleMenu();">Загрузка...</div>
+    <!-- Кнопка теперь единственная и всегда видна -->
+    <div id="routeHeaderBtn" onclick="toggleMenu();">Выберите маршрут</div>
+</div>
+
+<!-- Выпадающее меню под верхней кнопкой -->
+<div id="filterMenu">
+    <div class="menu-header" onclick="event.stopPropagation()">
+        <select id="sourceSelect" class="source-select" onchange="loadDataBySelect(this); toggleMenu(false);"><option value="" disabled selected>Загрузить файл...</option></select>
+    </div>
+    <div id="pointsList"></div>
 </div>
 
 <div class="bottom-ui-wrapper">
     <div id="navHud">
         <div class="hud-header">
             <span class="hud-index" id="hudIndex">1</span>
-            <div class="hud-cmd" id="hudCmd">Выберите маршрут...</div>
+            <div class="hud-cmd" id="hudCmd">Ожидание...</div>
         </div>
         <div class="hud-stats">
             <div class="stat-item"><span class="stat-label">ДИСТ:</span> <span class="stat-value" id="hudDist">---</span></div>
@@ -157,27 +183,16 @@
                 <div class="settings-row"><span>Азимут допуск</span><input type="number" class="trigger-input" value="45" onchange="CFG.AZ_TOLERANCE=+this.value"></div>
             </div>
         </div>
-
-        <div class="map-btn" onclick="toggleMenu(); event.stopPropagation();"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></div>
-        
-        <div id="filterMenu">
-            <div class="menu-header" onclick="event.stopPropagation()">
-                <select id="sourceSelect" class="source-select" onchange="loadDataBySelect(this); toggleMenu(false);"><option value="" disabled selected>Загрузить маршрут...</option></select>
-            </div>
-            <div id="pointsList"></div>
-        </div>
         
         <div id="locateBtn" class="map-btn active" onclick="autoCenter=!autoCenter; this.classList.toggle('active', autoCenter); wake();"><svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 7.48 7.94 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
     </div>
 </div>
 
 <script>
-// Telegram WebApp Initialization
 if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
-    // Красим хедер в черный, чтобы сливался с картой
     tg.setHeaderColor('#000000');
 }
 
@@ -343,9 +358,8 @@ async function loadData(url, routeName) {
         preloadRouteAudio(pointsData);
         currentIndex = 0; 
         
-        const header = ui('routeHeaderBtn');
-        header.innerText = routeName || "Маршрут загружен";
-        header.classList.add('visible');
+        // Обновляем текст кнопки
+        ui('routeHeaderBtn').innerText = routeName || "Маршрут загружен";
         
         refreshMap();
         map.setBounds(objectManager.getBounds(), {zoomMargin:60});
@@ -408,8 +422,16 @@ function renderList() {
         </div>`).join('');
 }
 
-const toggleMenu = s => { const m = ui('filterMenu'); m.style.display = (s ?? m.style.display!=='flex') ? 'flex' : 'none'; if(m.style.display==='flex') toggleSettings(false); };
-const toggleSettings = s => { const o = ui('settingsOverlay'); o.style.display = (s ?? o.style.display!=='flex') ? 'flex' : 'none'; if(o.style.display==='flex') toggleMenu(false); };
+const toggleMenu = s => { 
+    const m = ui('filterMenu'); 
+    m.style.display = (s ?? m.style.display!=='flex') ? 'flex' : 'none'; 
+    if(m.style.display==='flex') toggleSettings(false); 
+};
+const toggleSettings = s => { 
+    const o = ui('settingsOverlay'); 
+    o.style.display = (s ?? o.style.display!=='flex') ? 'flex' : 'none'; 
+    if(o.style.display==='flex') toggleMenu(false); 
+};
 </script>
 </body>
 </html>
