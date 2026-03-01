@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Route Editor Pro | Multi-file Storage</title>
+    <title>Route Editor Pro | Cloud Storage</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     
     <!-- SDK -->
@@ -76,7 +76,7 @@
     </div>
     
     <div class="welcome-card" id="newRouteForm" style="display: none;">
-        <h2>Название файла</h2>
+        <h2>Название маршрута</h2>
         <input type="text" id="newRouteName" placeholder="Напр: Центр-Автозавод">
         <button class="welcome-btn btn-primary" onclick="handleCreateNew()">Создать</button>
         <button class="welcome-btn btn-secondary" onclick="backToMain()">Назад</button>
@@ -187,7 +187,7 @@ async function ensureUserStorage() {
     const gists = await api(`https://api.github.com/gists?t=${Date.now()}`);
     if(!gists) {
         $('loadingOverlay').style.display = 'none';
-        tg.showAlert("Ошибка авторизации GitHub");
+        tg.showAlert("Ошибка авторизации GitHub. Проверьте Token.");
         return false;
     }
 
@@ -195,7 +195,6 @@ async function ensureUserStorage() {
     if(storage) {
         userGistId = storage.id;
     } else {
-        // Создаем новый гист-хранилище с одним индексным файлом
         const created = await api('https://api.github.com/gists', 'POST', {
             public: false,
             description: STORAGE_DESC,
@@ -234,13 +233,13 @@ async function showGistList() {
                 <div style="flex:1" onclick="loadFile('${fn}')">
                     <strong>${fn.replace('.json', '')}</strong>
                 </div>
-                <button class="btn-delete-file" onclick="deleteFile('${fn}')" style="background:none; border:none; color: #ccc; cursor:pointer; padding: 10px;">🗑️</button>
+                <button onclick="event.stopPropagation(); deleteFile('${fn}')" style="background:none; border:none; color: #ccc; cursor:pointer; padding: 10px; font-size:18px">🗑️</button>
             `;
             list.appendChild(item);
         }
     });
 
-    if(!filesFound) list.innerHTML = 'У вас пока нет маршрутов';
+    if(!filesFound) list.innerHTML = '<p style="padding:20px; color:#8e8e93">У вас пока нет маршрутов</p>';
 }
 
 async function handleCreateNew() {
@@ -248,11 +247,8 @@ async function handleCreateNew() {
     if(!name) return tg.showAlert("Введите название");
     
     currentFileName = name + ".json";
-    
-    // Сначала проверим/создадим хранилище
     if(!await ensureUserStorage()) return;
 
-    // Сразу переходим к карте, файл создастся при первом сохранении
     points = [];
     initApp();
 }
@@ -265,12 +261,8 @@ async function loadFile(fn) {
     let parsed = [];
     try { parsed = JSON.parse(content); } catch(e) {}
     
-    points.forEach(p => { 
-        map.geoObjects.remove(p.pm); 
-        p.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); 
-    });
+    clearAll();
     
-    points = [];
     parsed.forEach(dp => {
         const p = addP([dp.lat, dp.lon], { id: dp.id, az: dp.az, color: dp.color });
         dp.paths.forEach(dpa => { cur = p; addPath(dpa); });
@@ -281,15 +273,20 @@ async function loadFile(fn) {
     initApp();
 }
 
+function clearAll() {
+    points.forEach(p => { 
+        map.geoObjects.remove(p.pm); 
+        p.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); 
+    });
+    points = [];
+}
+
 async function deleteFile(fn) {
     if(!confirm(`Удалить маршрут "${fn}"?`)) return;
     $('loadingOverlay').style.display = 'flex';
-    
-    // В Gist API удаление файла происходит через патч с null значением
     await api(`https://api.github.com/gists/${userGistId}`, 'PATCH', {
         files: { [fn]: null }
     });
-    
     $('loadingOverlay').style.display = 'none';
     showGistList();
 }
@@ -319,8 +316,7 @@ async function saveToGist() {
     }
 }
 
-// ... MAP ENGINE (UNCHANGED CORE) ...
-
+// MAP ENGINE
 const getSvg = (col, txt, az, isEnd) => {
     const s = isEnd ? 34 : 40, c = s/2;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}"><g transform="rotate(${az},${c},${c})"><polygon points="${c},2 ${s*0.75},${s-5} ${c},${s*0.65} ${s*0.25},${s-5}" fill="${col}" stroke="#000" stroke-width="1.5"/></g><circle cx="${c}" cy="${c}" r="${isEnd?7:9}" fill="${col}" stroke="#000" stroke-width="1"/><text x="${c}" y="${c+3}" font-size="10" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" style="paint-order:stroke fill">${txt}</text></svg>`);
@@ -330,7 +326,12 @@ ymaps.ready(() => {
     tg.expand();
     $('userNameText').textContent = `Привет, ${tg.initDataUnsafe?.user?.first_name || 'Водитель'}!`;
     map = new ymaps.Map("map", { center: [56.3399, 43.9332], zoom: 17, type: 'yandex#satellite', controls: [] });
-    map.events.add('click', e => { if(isAdd) { const p = addP(e.get('coords'), { color: pend.color, initialPath: { cmd: pend.cmd ? [pend.cmd] : [], comm: pend.comm } }); startDrawingForPoint(p); } });
+    map.events.add('click', e => { 
+        if(isAdd) { 
+            const p = addP(e.get('coords'), { color: pend.color, initialPath: { cmd: pend.cmd ? [pend.cmd] : [], comm: pend.comm } }); 
+            startDrawingForPoint(p); 
+        } 
+    });
     initD('newColorDropdown', 'newColorBtn', (h, n) => { pend.color = n; updateCommandOptions('newCmdSelect', n); });
     initD('editColorDropdown', 'editColorBtn', (h, n) => { if(cur) { cur.color = n; updateCommandOptions('editCmdSelect', n); applyChanges(); } });
     if(localStorage.getItem('gh_t_gist')) $('ghTokenWelcome').value = localStorage.getItem('gh_t_gist');
@@ -396,13 +397,57 @@ const stopDrawingMode = () => {
     isDrawing = false; $('addIcon').textContent = "+"; $('addMarkerBtn').classList.remove('drawing'); cur = null; 
 };
 
-const openEdit = p => { cur = p; const pa = p.paths[0] || {}; $('editTitle').textContent = `Метка #${p.id}`; $('editComm').value = pa.comm || ''; updateCommandOptions('editCmdSelect', p.color, pa.cmd?.[0] || ""); $('editColorBtn').style.background = COLORS[p.color].hex; toggleM('editModal'); };
-function applyChanges() { if(!cur) return; const pa = cur.paths[0]; if(pa) { pa.comm = $('editComm').value; const v = $('editCmdSelect').value; pa.cmd = v ? [v] : []; pa.line.options.set('strokeColor', COLORS[cur.color].hex); if(pa.pmEnd) updPI(pa, 1); } updI(cur); }
-const startEditPath = () => { const p = cur; toggleM('editModal'); isDrawing = true; $('addIcon').textContent = "✅"; $('addMarkerBtn').classList.add('drawing'); p.pm.options.set('draggable', true); p.paths[0].line.editor.startEditing(); p.paths[0].line.editor.options.set('vertexDraggable', idx => idx !== 0); };
-const delP = () => { if(!confirm("Удалить?")) return; points = points.filter(p => p !== cur); map.geoObjects.remove(cur.pm); cur.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); points.forEach((p, i) => { p.id = i+1; updI(p); }); toggleM('editModal'); cur = null; };
+const openEdit = p => { 
+    cur = p; const pa = p.paths[0] || {}; 
+    $('editTitle').textContent = `Метка #${p.id}`; 
+    $('editComm').value = pa.comm || ''; 
+    updateCommandOptions('editCmdSelect', p.color, pa.cmd?.[0] || ""); 
+    $('editColorBtn').style.background = COLORS[p.color].hex; 
+    toggleM('editModal'); 
+};
+
+function applyChanges() { 
+    if(!cur) return; 
+    const pa = cur.paths[0]; 
+    if(pa) { 
+        pa.comm = $('editComm').value; 
+        const v = $('editCmdSelect').value; 
+        pa.cmd = v ? [v] : []; 
+        pa.line.options.set('strokeColor', COLORS[cur.color].hex); 
+        if(pa.pmEnd) updPI(pa, 1); 
+    } 
+    updI(cur); 
+}
+
+const startEditPath = () => { 
+    const p = cur; 
+    toggleM('editModal'); 
+    isDrawing = true; 
+    $('addIcon').textContent = "✅"; 
+    $('addMarkerBtn').classList.add('drawing'); 
+    p.pm.options.set('draggable', true); 
+    p.paths[0].line.editor.startEditing(); 
+    p.paths[0].line.editor.options.set('vertexDraggable', idx => idx !== 0); 
+};
+
+const delP = () => { 
+    if(!confirm("Удалить точку?")) return; 
+    points = points.filter(p => p !== cur); 
+    map.geoObjects.remove(cur.pm); 
+    cur.paths.forEach(pa => { map.geoObjects.remove(pa.line); if(pa.pmEnd) map.geoObjects.remove(pa.pmEnd); }); 
+    points.forEach((p, i) => { p.id = i+1; updI(p); }); 
+    toggleM('editModal'); cur = null; 
+};
 
 function addPath(data = null) {
-    const sp = data?.pts ? data.pts[0] : [cur.lat, cur.lon], po = { cmd: data?.cmd || [], comm: data?.comm || '', az: data?.az || 0, pts: data?.pts || [sp], line: new ymaps.Polyline(data?.pts || [sp], {}, { strokeColor: COLORS[cur.color].hex, strokeWidth: 5, strokeOpacity: 0.8, zIndex: 500 }) };
+    const sp = data?.pts ? data.pts[0] : [cur.lat, cur.lon], 
+    po = { 
+        cmd: data?.cmd || [], 
+        comm: data?.comm || '', 
+        az: data?.az || 0, 
+        pts: data?.pts || [sp], 
+        line: new ymaps.Polyline(data?.pts || [sp], {}, { strokeColor: COLORS[cur.color].hex, strokeWidth: 5, strokeOpacity: 0.8, zIndex: 500 }) 
+    };
     po.line.geometry.events.add('change', () => {
         const c = po.line.geometry.getCoordinates(); po.pts = c.map(pt => [f6(pt[0]), f6(pt[1])]);
         const o = points.find(p => p.paths.includes(po));
@@ -418,7 +463,10 @@ function updPI(po, num) {
     const pts = po.line.geometry.getCoordinates(); if(!pts.length) return;
     const last = pts[pts.length-1], prev = pts[pts.length-2]; po.az = prev ? calcA(prev, last) : 0;
     const o = points.find(p => p.paths.includes(po)), col = o ? COLORS[o.color].hex : '#000';
-    if(!po.pmEnd) { po.pmEnd = new ymaps.Placemark(last, {}, { iconLayout: 'default#imageWithContent', iconImageSize: [34,34], iconImageOffset: [-17,-17], interactive: false, zIndex: 800 }); map.geoObjects.add(po.pmEnd); } else po.pmEnd.geometry.setCoordinates(last);
+    if(!po.pmEnd) { 
+        po.pmEnd = new ymaps.Placemark(last, {}, { iconLayout: 'default#imageWithContent', iconImageSize: [34,34], iconImageOffset: [-17,-17], interactive: false, zIndex: 800 }); 
+        map.geoObjects.add(po.pmEnd); 
+    } else po.pmEnd.geometry.setCoordinates(last);
     po.pmEnd.options.set({ iconImageHref: getSvg(col, num, po.az, true) });
 }
 </script>
